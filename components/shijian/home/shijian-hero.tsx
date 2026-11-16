@@ -15,6 +15,12 @@ export interface ShijianHeroProps {
 
 const ROTATOR_WORDS = ['史料阅读', '史料辨析', '历史解释'] as const;
 
+const TASK_ICONS = {
+  reading: FileText,
+  analysis: Search,
+  explanation: MessageSquare,
+} as const;
+
 const ROTATION_INTERVAL = 2600;
 
 export function ShijianHero({ onStartTask }: ShijianHeroProps) {
@@ -97,8 +103,7 @@ export function ShijianHero({ onStartTask }: ShijianHeroProps) {
           >
             {TASK_ORDER.map((task) => {
               const meta = TASK_META[task];
-              const Icon = task === 'reading' ? FileText : task === 'analysis' ? Search : MessageSquare;
-              const selected = task === active;
+              const Icon = TASK_ICONS[task];              const selected = task === active;
               return (
                 <button
                   key={task}
