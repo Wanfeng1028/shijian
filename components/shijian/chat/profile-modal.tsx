@@ -11,6 +11,7 @@ import { Select, SelectItem } from '@/components/boardui/base/select/select';
 import { Input } from '@/components/boardui/base/input/input';
 import { Button } from '@/components/boardui/base/buttons/button';
 import type { Profile } from '@/lib/store';
+import { GRADE_OPTIONS, PROFILE_EMPTY_OPTION, SEMESTER_OPTIONS, TEXTBOOK_OPTIONS } from '@/components/shijian/chat/task-meta';
 import { cx } from '@/utils/cx';
 
 export interface ProfileModalProps {
@@ -19,16 +20,6 @@ export interface ProfileModalProps {
   initial: Profile | null;
   onSaved: (profile: Profile) => void;
 }
-
-const GRADE_OPTIONS = ['高一', '高二', '高三'];
-const SEMESTER_OPTIONS = ['上学期', '下学期'];
-const TEXTBOOK_OPTIONS = [
-  '《中外历史纲要（上）》',
-  '《中外历史纲要（下）》',
-  '选必一《国家制度与社会治理》',
-  '选必二《经济与社会生活》',
-  '选必三《文化交流与传播》',
-];
 
 export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalProps) {
   const [grade, setGrade] = useState<string>(initial?.grade ?? '');
@@ -69,9 +60,9 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
           <Select
             label="年级"
             selectedKey={grade === '' ? '' : grade}
-            onSelectionChange={(key) => setGrade(key == null ? '' : String(key))}
+            onSelectionChange={(key) => setGrade(key === null || key === undefined ? '' : String(key))}
           >
-            <SelectItem id="">请选择</SelectItem>
+            <SelectItem id="">{PROFILE_EMPTY_OPTION}</SelectItem>
             {GRADE_OPTIONS.map((option) => (
               <SelectItem key={option} id={option}>
                 {option}
@@ -81,9 +72,9 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
           <Select
             label="学期"
             selectedKey={semester === '' ? '' : semester}
-            onSelectionChange={(key) => setSemester(key == null ? '' : String(key))}
+            onSelectionChange={(key) => setSemester(key === null || key === undefined ? '' : String(key))}
           >
-            <SelectItem id="">请选择</SelectItem>
+            <SelectItem id="">{PROFILE_EMPTY_OPTION}</SelectItem>
             {SEMESTER_OPTIONS.map((option) => (
               <SelectItem key={option} id={option}>
                 {option}
@@ -93,9 +84,9 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
           <Select
             label="教材"
             selectedKey={textbook === '' ? '' : textbook}
-            onSelectionChange={(key) => setTextbook(key == null ? '' : String(key))}
+            onSelectionChange={(key) => setTextbook(key === null || key === undefined ? '' : String(key))}
           >
-            <SelectItem id="">请选择</SelectItem>
+            <SelectItem id="">{PROFILE_EMPTY_OPTION}</SelectItem>
             {TEXTBOOK_OPTIONS.map((option) => (
               <SelectItem key={option} id={option}>
                 {option}

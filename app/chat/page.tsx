@@ -8,6 +8,7 @@ import { Topbar } from '@/components/shijian/topbar';
 import { ProfileModal } from '@/components/shijian/chat/profile-modal';
 import { EvaluateCard } from '@/components/shijian/chat/evaluate-card';
 import {
+  CONTEXT_EMPTY_OPTION,
   GRADE_OPTIONS,
   TASK_META,
   TASK_ORDER,
@@ -35,7 +36,7 @@ function resolveInitialTask(param: string | null): TaskId {
 function GradeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <Select label="年级" selectedKey={value === '' ? '' : value} onSelectionChange={(key) => onChange(String(key))}>
-      <SelectItem id="">{'未设置'}</SelectItem>
+      <SelectItem id="">{CONTEXT_EMPTY_OPTION}</SelectItem>
       {GRADE_OPTIONS.map((g) => (
         <SelectItem key={g} id={g}>{g}</SelectItem>
       ))}
@@ -46,7 +47,7 @@ function GradeSelect({ value, onChange }: { value: string; onChange: (v: string)
 function TextbookSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <Select label="教材" selectedKey={value === '' ? '' : value} onSelectionChange={(key) => onChange(String(key))}>
-      <SelectItem id="">{'未设置'}</SelectItem>
+      <SelectItem id="">{CONTEXT_EMPTY_OPTION}</SelectItem>
       {TEXTBOOK_OPTIONS.map((t) => (
         <SelectItem key={t} id={t}>{t}</SelectItem>
       ))}
@@ -97,8 +98,6 @@ function ChatPageInner() {
     pendingDocName,
     currentTask,
     switchTask,
-    topic,
-    setTopic,
     grade,
     setGrade,
     textbook,

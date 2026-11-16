@@ -1,13 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 import { loadRecords, clearRecords, loadProfile, saveProfile } from '@/lib/store';
 import type { Profile, RecordItem } from '@/lib/store';
 import { Topbar } from '@/components/shijian/topbar';
 import { Select, SelectItem } from '@/components/boardui/base/select/select';
-import { Button } from '@/components/boardui/base/buttons/button';
+import { Button, ButtonLink } from '@/components/boardui/base/buttons/button';
 import { AlertDialog } from '@/components/boardui/base/modal/modal';
 import { cx } from '@/utils/cx';
 
@@ -104,14 +103,7 @@ export default function RecordsPage() {
             <div className="px-4 py-10 text-center">
               <p className="text-body-medium text-text-tertiary">暂无学习记录，先去对话页完成一次探究</p>
               <div className="mt-4 flex justify-center">
-                <Link
-                  href="/chat"
-                  className={cx(
-                    'inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring',
-                  )}
-                >
-                  <Button size="medium">去 AI 对话</Button>
-                </Link>
+                <ButtonLink href="/chat" size="medium">去 AI 对话</ButtonLink>
               </div>
             </div>
           ) : filtered.length === 0 ? (

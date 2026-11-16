@@ -106,6 +106,7 @@ export function AgentComposer({
           <label className="sr-only" htmlFor="agent-composer-input">
             Message
           </label>
+          {/* 本地化：输入框占位符由 BoardUI 原文 Ask me anything 改为中文（史鉴副本，MIT 允许改） */}
           <input
             id="agent-composer-input"
             ref={inputRef}
@@ -113,7 +114,7 @@ export function AgentComposer({
             value={value}
             onChange={(event) => onValueChange(event.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Ask me anything"
+            placeholder="输入你的观察或问题…"
             autoComplete="off"
             className="h-5 min-w-0 flex-1 bg-transparent text-body-regular text-text-primary caret-text-primary outline-none placeholder:text-text-tertiary"
           />
