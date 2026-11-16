@@ -5,7 +5,6 @@ import {
   findLastUserIndex,
   parseEvaluationJson,
   sanitizeMessages,
-  toVisionMessages,
   withSystem,
   type ShijianInput,
   type ShijianMessage
@@ -15,9 +14,8 @@ export const runtime = 'edge';
 
 const RATE = new Map<string, number[]>();
 
-const PRIMARY = 'baidu/ernie-5.5-flash-preview:free';
-const FALLBACK = 'inclusionai/ling-3.2-flash:free';
-const VISION = 'nvidia/nemotron-3.5-super-vl:free';
+const PRIMARY = 'glm-5.3';
+const FALLBACK = 'spark-x2.6';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
@@ -59,7 +57,7 @@ function getRetrievalQuery(input: ShijianInput, messages: ShijianMessage[]): str
   return typeof content === 'string' ? content : String(content ?? '');
 }
 
-async function callOpenRouter(
+async function callBotsRouter(
   apiKey: string,
   model: string,
   msgs: ChatMessage[],
@@ -70,13 +68,11 @@ async function callOpenRouter(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.botsarena.tech/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://shijian.pages.dev',
-        'X-Title': 'shijian'
+        'Content-Type': 'application/json'
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -87,7 +83,7 @@ async function callOpenRouter(
     });
 
     if (!response.ok) {
-      throw new Error('OpenRouter upstream error with status ' + response.status);
+      throw new Error('BotsRouter upstream error with status ' + response.status);
     }
 
     const data = (await response.json()) as any;
@@ -100,7 +96,7 @@ async function callOpenRouter(
     }
 
     if (typeof text !== 'string' || !text.trim()) {
-      throw new Error('OpenRouter returned empty content');
+      throw new Error('BotsRouter returned empty content');
     }
 
     return { text, model };
@@ -113,7 +109,7 @@ function sseEncode(obj: unknown): string {
   return 'data: ' + JSON.stringify(obj) + '\n\n';
 }
 
-async function callOpenRouterStream(
+async function callBotsRouterStream(
   apiKey: string,
   model: string,
   msgs: ChatMessage[],
@@ -135,13 +131,11 @@ async function callOpenRouterStream(
   const totalTimer = setTimeout(() => controller.abort(), 55000);
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetch('https://api.botsarena.tech/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://shijian.pages.dev',
-        'X-Title': 'shijian'
+        'Content-Type': 'application/json'
       },
       signal: controller.signal,
       body: JSON.stringify({
@@ -153,11 +147,11 @@ async function callOpenRouterStream(
     });
 
     if (!response.ok) {
-      throw new Error('OpenRouter upstream error with status ' + response.status);
+      throw new Error('BotsRouter upstream error with status ' + response.status);
     }
 
     if (!response.body) {
-      throw new Error('OpenRouter returned empty stream');
+      throw new Error('BotsRouter returned empty stream');
     }
 
     const reader = response.body.getReader();
@@ -210,7 +204,7 @@ async function callOpenRouterStream(
     }
 
     if (!fullText.trim()) {
-      throw new Error('OpenRouter returned empty content');
+      throw new Error('BotsRouter returned empty content');
     }
 
     return { text: fullText, model };
@@ -236,9 +230,9 @@ export async function POST(request: Request): Promise<Response> {
     return json(429, { error: 'rate_limited', message: '请求太频繁，请稍后再试' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.BOTSROUTER_API_KEY;
   if (!apiKey || !String(apiKey).trim()) {
-    return json(503, { error: 'backend_not_configured', message: '后端未配置：未设置 OPENROUTER_API_KEY' });
+    return json(503, { error: 'backend_not_configured', message: '后端未配置：未设置 BOTSROUTER_API_KEY' });
   }
 
   const action = body.action;
@@ -270,20 +264,16 @@ export async function POST(request: Request): Promise<Response> {
       async start(controller) {
         try {
           if (hasImage) {
-            try {
-              const visionMessages = withSystem(system, toVisionMessages(messages, imageData));
-              const result = await callOpenRouter(apiKey, VISION, visionMessages, 1500);
-              controller.enqueue(encoder.encode(sseEncode({ t: result.text })));
-              controller.enqueue(encoder.encode(sseEncode({ done: true, model: result.model })));
-              return;
-            } catch (_) {}
+            // BotsRouter 模型清单里没有 vision 模型，不编造模型 ID。
+            // 先诚实告知图片未被解析，再继续走文字对话，不破坏对话。
+            controller.enqueue(encoder.encode(sseEncode({ t: '图片暂无法解析，请用文字描述关键内容。' })));
           }
 
           const textMessages = withSystem(system, messages);
           let tokenSent = false;
 
           try {
-            await callOpenRouterStream(apiKey, PRIMARY, textMessages, 2000, {
+            await callBotsRouterStream(apiKey, PRIMARY, textMessages, 2000, {
               onToken(delta) {
                 tokenSent = true;
                 controller.enqueue(encoder.encode(sseEncode({ t: delta })));
@@ -302,7 +292,7 @@ export async function POST(request: Request): Promise<Response> {
           }
 
           const runFallback = async () => {
-            await callOpenRouterStream(apiKey, FALLBACK, textMessages, 2000, {
+            await callBotsRouterStream(apiKey, FALLBACK, textMessages, 2000, {
               firstTokenTimeoutMs: 30000,
               onToken(delta) {
                 tokenSent = true;
@@ -333,7 +323,7 @@ export async function POST(request: Request): Promise<Response> {
           }
 
           if (hasImage) {
-            controller.enqueue(encoder.encode(sseEncode({ t: '图片暂无法解析，请用文字描述关键内容。' })));
+            // 图片未解析的提示已在流开头
             controller.enqueue(encoder.encode(sseEncode({ done: true, model: 'none' })));
           } else {
             controller.enqueue(encoder.encode(sseEncode({
@@ -376,10 +366,10 @@ export async function POST(request: Request): Promise<Response> {
     let result: { text: string; model: string } | null = null;
 
     try {
-      result = await callOpenRouter(apiKey, PRIMARY, messages, 800);
+      result = await callBotsRouter(apiKey, PRIMARY, messages, 800);
     } catch (_) {
       try {
-        result = await callOpenRouter(apiKey, FALLBACK, messages, 800);
+        result = await callBotsRouter(apiKey, FALLBACK, messages, 800);
       } catch (__) {}
     }
 

@@ -41,7 +41,8 @@ export interface UseShijianChatResult {
 }
 
 const STALL_MS = 45000
-const EVAL_TIMEOUT_MS = 60000
+// 评价最坏情况：PRIMARY 55 秒 + FALLBACK 55 秒 = 110 秒，60 秒会在 PRIMARY 慢失败时掐断 FALLBACK；放宽到 120 秒才兜得住。STALL_MS 保持 45 秒不变（必须比服务端 55 秒短，abort+重试才有意义）。
+const EVAL_TIMEOUT_MS = 120000
 const MAX_ATTEMPTS = 2
 
 function welcomeFor(task: TaskId): ChatMessage {
@@ -174,7 +175,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
             }
             if (data && data.error === 'backend_not_configured') {
               fatal = 'backend_not_configured'
-              fatalStatus = '后端未配置：请联系管理员配置 OPENROUTER_API_KEY 后再试'
+              fatalStatus = '后端未配置：请联系管理员配置 BOTSROUTER_API_KEY 后再试'
               break
             }
             if (data && data.error === 'rate_limited') {

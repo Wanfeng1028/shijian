@@ -313,8 +313,8 @@ function ChatPageInner() {
               onSubmit={handleSubmit}
               onStop={stop}
               busy={busy}
-              model="baidu/ernie-5.5-flash-preview:free"
-              provider="OpenRouter"
+              model="glm-5.3"
+              provider="BotsRouter"
               messageCount={messages.length}
             />
 
