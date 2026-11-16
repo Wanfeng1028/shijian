@@ -1,2 +1,7 @@
 node_modules/
 .DS_Store
+.next/
+.open-next/
+.wrangler/
+*.local
+.vercel/
