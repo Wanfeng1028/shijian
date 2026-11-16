@@ -1,28 +1,31 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ChevronDown, FileText, Image as ImageIcon, UserRound } from 'lucide-react';
+import { RiCloseLine, RiMenuLine } from '@remixicon/react';
+import { FileText, Image as ImageIcon } from 'lucide-react';
 import { cx } from '@/utils/cx';
-import { Topbar } from '@/components/shijian/topbar';
 import { ProfileModal } from '@/components/shijian/chat/profile-modal';
 import { EvaluateCard } from '@/components/shijian/chat/evaluate-card';
-import {
-  CONTEXT_EMPTY_OPTION,
-  GRADE_OPTIONS,
-  TASK_META,
-  TASK_ORDER,
-  TEXTBOOK_OPTIONS,
-  type TaskId,
-} from '@/components/shijian/chat/task-meta';
+import { ChatSidebar } from '@/components/shijian/chat/chat-sidebar';
+import { HistoryRail } from '@/components/shijian/chat/history-rail';
+import { TASK_META, TASK_ORDER, type TaskId } from '@/components/shijian/chat/task-meta';
 import { useShijianChat } from '@/components/shijian/chat/use-shijian-chat';
-import { loadTask } from '@/lib/store';
+import { loadRecords, loadTask } from '@/lib/store';
+import { AgentChatActions } from '@/components/boardui/application/agent-chat/agent-chat-actions';
 import { AgentComposer } from '@/components/boardui/application/agent-chat/agent-composer';
 import { AgentMessage } from '@/components/boardui/application/agent-chat/agent-chat-message';
 import { AgentThinking } from '@/components/boardui/application/agent-thinking/agent-thinking';
-import { Select, SelectItem } from '@/components/boardui/base/select/select';
 import { Button } from '@/components/boardui/base/buttons/button';
-import { ScrollFade, useScrollFade } from '@/components/boardui/foundations/scroll-fade/scroll-fade';
+import { IconButton } from '@/components/boardui/base/buttons/icon-button';
+
+/**
+ * 史鉴对话页。布局与结构直接套用 BoardUI chat-starter / AgentChat 模板原样
+ *（外框 h-dvh p-3 gap-4；260px 侧栏 + rounded-3xl secondary 聊天面 +
+ * xl 下 260px 记录栏；覆盖式 h-12 header；transcript 列 max-w-3xl pt-[72px]；
+ * 空状态建议芯片；52px pill 输入框）；只换里面的史鉴内容。
+ * 数据流不动：use-shijian-chat → /api/chat SSE → localStorage 记录。
+ */
 
 const VALID_TASKS = new Set<string>(TASK_ORDER);
 
@@ -33,64 +36,22 @@ function resolveInitialTask(param: string | null): TaskId {
   return 'reading';
 }
 
-function GradeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <Select label="年级" selectedKey={value === '' ? '' : value} onSelectionChange={(key) => onChange(String(key))}>
-      <SelectItem id="">{CONTEXT_EMPTY_OPTION}</SelectItem>
-      {GRADE_OPTIONS.map((g) => (
-        <SelectItem key={g} id={g}>{g}</SelectItem>
-      ))}
-    </Select>
-  );
-}
-
-function TextbookSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return (
-    <Select label="教材" selectedKey={value === '' ? '' : value} onSelectionChange={(key) => onChange(String(key))}>
-      <SelectItem id="">{CONTEXT_EMPTY_OPTION}</SelectItem>
-      {TEXTBOOK_OPTIONS.map((t) => (
-        <SelectItem key={t} id={t}>{t}</SelectItem>
-      ))}
-    </Select>
-  );
-}
-
-function TaskSwitcher({ current, onSwitch }: { current: TaskId; onSwitch: (t: TaskId) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      {TASK_ORDER.map((id) => {
-        const active = id === current;
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onSwitch(id)}
-            className={cx(
-              'rounded-xl border px-4 py-2.5 text-left text-body-medium outline-none transition-colors',
-              'focus-visible:ring-2 focus-visible:ring-border-focus-ring',
-              active
-                ? 'border-accent-300 bg-accent-50 text-accent-900'
-                : 'border-border-button-default text-text-secondary hover:border-border-button-hover hover:bg-background-secondary-default',
-            )}
-          >
-            {TASK_META[id].label}
-          </button>
-        );
-      })}
-    </div>
-  );
+function deriveTitle(messages: Array<{ role: string; content: string }>): string {
+  const firstUser = messages.find((m) => m.role === 'user');
+  const text = firstUser?.content.trim() ?? '';
+  if (!text) return '新对话';
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text;
 }
 
 function ChatPageInner() {
   const searchParams = useSearchParams();
   const taskParam = searchParams.get('task');
   const [initialTask] = useState<TaskId>(() => resolveInitialTask(taskParam));
-  const [mobileCardOpen, setMobileCardOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   const chat = useShijianChat(initialTask);
   const {
     messages,
-    status,
     busy,
     streamingText,
     pendingImage,
@@ -108,6 +69,7 @@ function ChatPageInner() {
     saveProfileAndSync,
     send,
     stop,
+    resetChat,
     evaluate,
     scores,
     advice,
@@ -125,7 +87,44 @@ function ChatPageInner() {
   const [inputValue, setInputValue] = useState('');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const docInputRef = useRef<HTMLInputElement | null>(null);
-  const scrollFade = useScrollFade();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  /** True once the transcript is scrolled at all. */
+  const [scrolledUnder, setScrolledUnder] = useState(false);
+  /** Whether the title and the message column actually overlap horizontally. */
+  const [canClash, setCanClash] = useState(false);
+
+  const headerTitle = useMemo(() => deriveTitle(messages), [messages]);
+
+  const transcript = useMemo(
+    () =>
+      messages
+        .map((m) => `${m.role === 'user' ? '我' : '史鉴'}：${m.content}`)
+        .filter((line) => !line.endsWith('：'))
+        .join('\n\n'),
+    [messages],
+  );
+
+  const profileLabel = useMemo(() => {
+    if (!profile) return '我的学习档案';
+    const parts = [profile.grade, profile.textbook].filter(Boolean);
+    return parts.length > 0 ? parts.join(' · ') : '我的学习档案';
+  }, [profile]);
+
+  const exportRecords = useCallback(() => {
+    const records = loadRecords();
+    if (records.length === 0) return;
+    const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'shijian-records.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, []);
 
   useEffect(() => {
     if (restoredText !== null) {
@@ -134,252 +133,303 @@ function ChatPageInner() {
     }
   }, [restoredText, clearRestoredText]);
 
+  // Geometry, not a breakpoint: the title is as wide as its text, so whether
+  // it reaches the column depends on both and has to be measured.
+  useEffect(() => {
+    const measure = () => {
+      const title = titleRef.current?.getBoundingClientRect();
+      const column = columnRef.current?.getBoundingClientRect();
+      if (!title || !column) return;
+      // A 16px buffer so text never slides right up against the title.
+      setCanClash(title.right + 16 > column.left);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (scrollRef.current) observer.observe(scrollRef.current);
+    return () => observer.disconnect();
+  }, [messages.length, headerTitle]);
+
+  // Template scrolls on every streamed token because its `messages` mutate
+  // per token; here streamed text lives in `streamingText`, so it must be a
+  // dep too, or the transcript only scrolls when a message commits.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, busy, streamingText]);
+
+  // Escape closes the mobile drawer (Modern Web Guidance: navigation-drawer —
+  // a drawer must dismiss on Escape as well as on backdrop / close button).
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [navOpen]);
+
   const handleSubmit = () => {
     const value = inputValue;
     setInputValue('');
     void send(value);
   };
 
-  const contextBlock = (
-    <div className="flex flex-col gap-3">
-      <GradeSelect value={grade} onChange={setGrade} />
-      <TextbookSelect value={textbook} onChange={setTextbook} />
-    </div>
-  );
-
-  const taskSwitchBlock = (
-    <TaskSwitcher current={currentTask} onSwitch={switchTask} />
+  const sidebar = (
+    <ChatSidebar
+      currentTask={currentTask}
+      onSwitchTask={(task) => {
+        switchTask(task);
+        setNavOpen(false);
+      }}
+      grade={grade}
+      setGrade={setGrade}
+      textbook={textbook}
+      setTextbook={setTextbook}
+      onOpenProfile={() => {
+        setProfileOpen(true);
+        setNavOpen(false);
+      }}
+    />
   );
 
   return (
-    <div className="min-h-dvh bg-background-full">
-      <div className="lg:hidden">
-        <Topbar
-          current="chat"
-          initialProfile={profile}
-          onProfileSaved={saveProfileAndSync}
-        />
+    <div className="relative flex h-dvh w-full gap-4 overflow-hidden bg-background-full p-3">
+      <div className="hidden lg:flex lg:h-full lg:shrink-0">
+        {sidebar}
       </div>
 
-      <div className="flex min-h-dvh flex-col gap-4 p-3 lg:h-dvh lg:flex-row">
-        {/* 移动端折叠卡片：任务切换 + 学习上下文 */}
-        <div className="rounded-3xl border border-border-button-default bg-background-primary-default p-4 lg:hidden">
+      {/* Below lg the sidebar rides in as an overlay drawer. The Pro template
+          pushes the workspace across instead; this is the plain version. */}
+      {navOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
           <button
             type="button"
-            onClick={() => setMobileCardOpen((v) => !v)}
-            aria-expanded={mobileCardOpen}
-            className="flex w-full items-center justify-between outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring"
-          >
-            <span className="text-title-3-semibold text-text-primary">任务与上下文</span>
-            <ChevronDown
-              className={cx(
-                'size-4 text-text-secondary transition-transform duration-200',
-                mobileCardOpen && 'rotate-180',
-              )}
+            aria-label="关闭导航"
+            onClick={() => setNavOpen(false)}
+            className="absolute inset-0 cursor-pointer bg-black/40"
+          />
+          <div className="relative flex h-full p-3">
+            <ChatSidebar
+              mobile
+              id="shijian-chat-sidebar"
+              onClose={() => setNavOpen(false)}
+              currentTask={currentTask}
+              onSwitchTask={(task) => {
+                switchTask(task);
+                setNavOpen(false);
+              }}
+              grade={grade}
+              setGrade={setGrade}
+              textbook={textbook}
+              setTextbook={setTextbook}
+              onOpenProfile={() => {
+                setProfileOpen(true);
+                setNavOpen(false);
+              }}
+              className="flex"
             />
-          </button>
-          {mobileCardOpen ? (
-            <>
-              <p className="mt-3 text-title-3-semibold text-text-primary">任务切换</p>
-              <div className="mt-3">{taskSwitchBlock}</div>
-              <p className="mt-4 text-title-3-semibold text-text-primary">学习上下文</p>
-              <div className="mt-3">{contextBlock}</div>
-            </>
-          ) : null}
+          </div>
+        </div>
+      )}
+
+      <div className="relative flex min-h-0 min-w-0 flex-1 gap-3 overflow-hidden">
+        <div className="relative flex h-full min-w-0 flex-1 flex-col overflow-hidden rounded-3xl bg-background-secondary-default">
+          <header
+            className={cx(
+              'absolute inset-x-0 top-0 z-10 flex h-12 items-center gap-2 border-b px-4 pt-[7px] transition-colors',
+              // Overlaid rather than stacked above the transcript. A rule only
+              // earns its place when the text both passes under the header AND
+              // the title is wide enough to be in its way. The border is always
+              // present but transparent, so appearing costs no height.
+              scrolledUnder && canClash
+                ? 'border-separator-border bg-background-primary-default/80 backdrop-blur-[20px]'
+                : 'border-transparent',
+            )}
+          >
+            <IconButton
+              icon={navOpen ? RiCloseLine : RiMenuLine}
+              size="small"
+              aria-label="打开导航"
+              aria-expanded={navOpen}
+              aria-controls="shijian-chat-sidebar"
+              onClick={() => setNavOpen((open) => !open)}
+              className="lg:hidden"
+            />
+            <span
+              ref={titleRef}
+              className="min-w-0 shrink truncate text-headline-medium text-text-primary"
+            >
+              {headerTitle}
+            </span>
+
+            <AgentChatActions
+              className="ms-auto"
+              transcript={transcript}
+              onExport={exportRecords}
+              onDelete={resetChat}
+              disabled={messages.length === 0}
+            />
+          </header>
+
+          <div
+            ref={scrollRef}
+            onScroll={(event) => setScrolledUnder(event.currentTarget.scrollTop > 0)}
+            className="min-h-0 flex-1 overflow-y-auto scroll-smooth"
+          >
+            <div
+              ref={columnRef}
+              className={cx(
+                'mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 pt-[72px] pb-6',
+                // With nothing to read, the prompt sits in the middle of
+                // the empty space rather than pinned under the header.
+                messages.length === 0 && 'min-h-full justify-center',
+              )}
+            >
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center gap-4 text-center">
+                  <div className="flex flex-col gap-1">
+                    <h2 className="text-title-2-medium text-text-primary">你好，我是史鉴</h2>
+                    <p className="text-body-regular text-text-secondary">{TASK_META[currentTask].desc}</p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {TASK_META[currentTask].quick.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => void send(suggestion)}
+                        className="cursor-pointer rounded-full bg-background-primary-default px-3.5 py-2 text-body-regular text-text-secondary shadow-xs transition-colors hover:bg-background-primary-hover"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                messages.map((m, i) => (
+                  <AgentMessage key={i} role={m.role} text={m.content} at={m.at} />
+                ))
+              )}
+
+              {messages.length > 0 ? (
+                <EvaluateCard
+                  scores={scores}
+                  advice={advice}
+                  evaluating={evaluating}
+                  onEvaluate={evaluate}
+                  disabled={busy || messages.length < 2}
+                />
+              ) : null}
+
+              {busy && streamingText === null ? (
+                <AgentThinking variant="wave" label="史鉴正在思考…" className="px-1" />
+              ) : null}
+              {streamingText !== null ? (
+                <AgentMessage role="assistant" text={streamingText} streaming />
+              ) : null}
+            </div>
+          </div>
+
+          <div className="shrink-0 px-3 pb-3">
+            <div className="mx-auto w-full max-w-3xl">
+              {notice ? (
+                <div className="mb-2 flex items-center justify-between rounded-xl border border-accent-300 bg-accent-50 px-3 py-2">
+                  <p className="text-body-2-regular text-accent-900">{notice}</p>
+                  <button
+                    type="button"
+                    onClick={clearNotice}
+                    className="text-caption-1-semibold text-text-tertiary outline-none hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+                  >
+                    关闭
+                  </button>
+                </div>
+              ) : null}
+
+              {pendingImage ? (
+                <div className="mb-2 flex items-center gap-3 rounded-xl border border-border-button-default bg-background-primary-default p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pendingImage} alt="待发送图片预览" className="h-[120px] w-[120px] rounded-md object-cover" />
+                  <Button variant="ghost" size="small" onClick={removeImage}>移除图片</Button>
+                </div>
+              ) : null}
+
+              {pendingDocName ? (
+                <div className="mb-2 flex items-center gap-3 rounded-xl border border-border-button-default bg-background-primary-default px-3 py-2">
+                  <FileText className="size-4 text-text-secondary" />
+                  <span className="min-w-0 flex-1 truncate text-body-2-regular text-text-secondary">{pendingDocName}</span>
+                  <Button variant="ghost" size="xs" onClick={removeDoc}>移除</Button>
+                </div>
+              ) : null}
+
+              <AgentComposer
+                value={inputValue}
+                onValueChange={setInputValue}
+                onSubmit={handleSubmit}
+                onStop={stop}
+                busy={busy}
+                model="spark-x2.6"
+                provider="BotsRouter"
+                messageCount={messages.length}
+              />
+
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="visually-hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageFile(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    disabled={busy}
+                    onClick={() => imageInputRef.current?.click()}
+                  >
+                    <ImageIcon className="size-4" />
+                    图片
+                  </Button>
+
+                  <input
+                    ref={docInputRef}
+                    type="file"
+                    accept=".txt,.md,.pdf,.doc,.docx"
+                    className="visually-hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleDocFile(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="small"
+                    disabled={busy}
+                    onClick={() => docInputRef.current?.click()}
+                  >
+                    <FileText className="size-4" />
+                    文档
+                  </Button>
+                </div>
+                <p className="hidden text-caption-1-semibold text-text-tertiary sm:block">
+                  纯文本文档可直接读取，PDF / Word 若无法读取正文，请复制粘贴文字。
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* 桌面端左侧栏 */}
-        <aside className="hidden w-[260px] shrink-0 flex-col rounded-3xl border border-border-button-default bg-background-primary-default p-4 lg:flex">
-          <div className="flex flex-col gap-1">
-            <p className="text-title-2-medium text-text-primary">史鉴</p>
-            <p className="text-caption-1-semibold text-text-tertiary">高中历史 AI 教学智能体</p>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-2">
-            <p className="text-title-3-semibold text-text-primary">任务切换</p>
-            {taskSwitchBlock}
-          </div>
-
-          <div className="mt-6 flex flex-col gap-2">
-            <p className="text-title-3-semibold text-text-primary">学习上下文</p>
-            {contextBlock}
-          </div>
-
-          <div className="mt-6">
-            <Button variant="secondary" size="medium" onClick={() => setProfileOpen(true)}>
-              <UserRound className="size-4" />
-              我的学习档案
-            </Button>
-          </div>
-
-          <div className="mt-auto pt-6">
-            <p className="text-caption-1-semibold text-text-tertiary">
-              史料原文、历史事实与 AI 推论会明确区分；史鉴不编造史料、人物原话、文献出处与历史数据。
-            </p>
-          </div>
-        </aside>
-
-        {/* 右侧对话面 */}
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col rounded-3xl border border-border-button-default bg-background-primary-default">
-          <div className="border-b border-separator-border px-6 pt-5 pb-4">
-            <h1 className="text-title-1-medium text-text-primary">AI 教学对话</h1>
-            <p className="mt-1 text-body-regular text-text-secondary">{TASK_META[currentTask].desc}</p>
-            {status ? (
-              <p className="mt-1 text-caption-1-semibold text-text-tertiary">{status}</p>
-            ) : null}
-          </div>
-
-          {/* 消息列表 */}
-          <div className="relative min-h-[200px] min-w-0 flex-1 px-6 lg:min-h-0">
-            <div
-              onScroll={scrollFade.onScroll}
-              className="h-full overflow-y-auto py-4"
-            >
-              <div className="flex flex-col gap-4">
-                {messages.map((m, i) => (
-                  <AgentMessage key={i} role={m.role} text={m.content} at={m.at} />
-                ))}
-                {busy && streamingText === null ? (
-                  <AgentThinking label="史鉴正在思考…" />
-                ) : null}
-                {streamingText !== null ? (
-                  <AgentMessage role="assistant" text={streamingText} streaming />
-                ) : null}
-              </div>
-            </div>
-            <ScrollFade progress={scrollFade.progress} surfaceClassName="from-background-primary-default" />
-          </div>
-
-          {/* 快捷提问 */}
-          <div className="px-6 pb-2">
-            <p className="text-caption-1-semibold text-text-tertiary">快捷提问</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {TASK_META[currentTask].quick.map((q) => (
-                <button
-                  key={q}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void send(q)}
-                  className={cx(
-                    'rounded-full border border-border-button-default bg-background-secondary-default px-3.5 py-1.5 text-body-2-medium text-text-secondary',
-                    'outline-none transition-colors hover:border-border-button-hover hover:text-text-primary',
-                    'focus-visible:ring-2 focus-visible:ring-border-focus-ring',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                  )}
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 输入区 */}
-          <div className="sticky bottom-0 border-t border-separator-border bg-background-primary-default px-6 pb-4 pt-3 lg:static lg:pb-6">
-            {notice ? (
-              <div className="mb-2 flex items-center justify-between rounded-xl border border-accent-300 bg-accent-50 px-3 py-2">
-                <p className="text-body-2-regular text-accent-900">{notice}</p>
-                <button
-                  type="button"
-                  onClick={clearNotice}
-                  className={cx(
-                    'text-caption-1-semibold text-text-tertiary outline-none hover:text-text-secondary',
-                    'focus-visible:ring-2 focus-visible:ring-border-focus-ring',
-                  )}
-                >
-                  关闭
-                </button>
-              </div>
-            ) : null}
-
-            {pendingImage ? (
-              <div className="mb-2 flex items-center gap-3 rounded-xl border border-border-button-default bg-background-secondary-default p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pendingImage} alt="待发送图片预览" className="h-[120px] w-[120px] rounded-md object-cover" />
-                <Button variant="ghost" size="small" onClick={removeImage}>移除图片</Button>
-              </div>
-            ) : null}
-
-            {pendingDocName ? (
-              <div className="mb-2 flex items-center gap-3 rounded-xl border border-border-button-default bg-background-secondary-default px-3 py-2">
-                <FileText className="size-4 text-text-secondary" />
-                <span className="min-w-0 flex-1 truncate text-body-2-regular text-text-secondary">{pendingDocName}</span>
-                <Button variant="ghost" size="xs" onClick={removeDoc}>移除</Button>
-              </div>
-            ) : null}
-
-            <AgentComposer
-              value={inputValue}
-              onValueChange={setInputValue}
-              onSubmit={handleSubmit}
-              onStop={stop}
-              busy={busy}
-              model="glm-5.3"
-              provider="BotsRouter"
-              messageCount={messages.length}
-            />
-
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5">
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="visually-hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleImageFile(file);
-                    e.target.value = '';
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="small"
-                  disabled={busy}
-                  onClick={() => imageInputRef.current?.click()}
-                >
-                  <ImageIcon className="size-4" />
-                  图片
-                </Button>
-
-                <input
-                  ref={docInputRef}
-                  type="file"
-                  accept=".txt,.md,.pdf,.doc,.docx"
-                  className="visually-hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleDocFile(file);
-                    e.target.value = '';
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="small"
-                  disabled={busy}
-                  onClick={() => docInputRef.current?.click()}
-                >
-                  <FileText className="size-4" />
-                  文档
-                </Button>
-              </div>
-            </div>
-
-            <p className="mt-2 text-caption-1-semibold text-text-tertiary">
-              Enter 发送，Shift + Enter 换行；纯文本文档可直接读取，PDF / Word 若无法读取正文，请复制粘贴文字。
-            </p>
-          </div>
-
-          {/* 学习反馈评价卡片 */}
-          <div className="border-t border-separator-border px-6 py-4">
-            <EvaluateCard
-              scores={scores}
-              advice={advice}
-              evaluating={evaluating}
-              onEvaluate={evaluate}
-              disabled={busy || messages.length < 2}
-            />
-          </div>
-        </main>
+        <HistoryRail
+          refreshKey={messages.length}
+          onNewChat={resetChat}
+          onOpenProfile={() => setProfileOpen(true)}
+          profileLabel={profileLabel}
+          onExport={exportRecords}
+          className="hidden xl:flex"
+        />
       </div>
 
       <ProfileModal

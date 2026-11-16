@@ -26,6 +26,8 @@ export interface UseShijianChatResult {
   saveProfileAndSync: (profile: Profile) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
+  /** Clears the open chat back to the template empty state. */
+  resetChat: () => void;
   evaluate: () => Promise<void>;
   scores: EvalScores | null;
   advice: string | null;
@@ -74,7 +76,8 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const stoppedRef = useRef(false)
 
   useEffect(() => {
-    setMessages([{ ...welcomeFor(initialTask), at: Date.now() }])
+    // Template empty state: start with no messages so the suggestion chips
+    // show; the welcome line lives in the empty state, not as a message.
     const p = loadProfile()
     if (p) {
       setProfile(p)
@@ -100,7 +103,17 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const switchTask = useCallback((task: TaskId) => {
     setCurrentTask(task)
     saveTask(task)
-    setMessages((prev) => [...prev, { ...welcomeFor(task), at: Date.now() }])
+    // Only greet mid-thread; on an empty thread the empty state already
+    // shows the new task's description and suggestion chips.
+    setMessages((prev) => (prev.length === 0 ? prev : [...prev, { ...welcomeFor(task), at: Date.now() }]))
+  }, [])
+
+  const resetChat = useCallback(() => {
+    setMessages([])
+    setScores(null)
+    setAdvice(null)
+    setNotice(null)
+    setStatus('准备就绪')
   }, [])
 
   const resetTimer = useCallback((controller: AbortController, onStall: () => void) => {
@@ -288,12 +301,14 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
 
       if (fatal) {
         setStatus(fatalStatus)
+        setNotice(fatalStatus)
         setRestoredText(text)
         setBusy(false)
         return
       }
 
       setStatus('服务暂时不可用，请稍后再试')
+      setNotice('服务暂时不可用，请稍后再试')
       setRestoredText(text)
       setBusy(false)
     },
@@ -417,6 +432,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     saveProfileAndSync,
     send,
     stop,
+    resetChat,
     evaluate,
     scores,
     advice,

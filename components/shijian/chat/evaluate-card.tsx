@@ -31,7 +31,7 @@ export function EvaluateCard({ scores, advice, evaluating, onEvaluate, disabled 
     <section
       className={cx(
         'rounded-3xl border border-border-button-default',
-        'bg-background-secondary-default',
+        'bg-background-primary-default',
         'flex flex-col gap-4 p-5'
       )}
     >
@@ -57,7 +57,7 @@ export function EvaluateCard({ scores, advice, evaluating, onEvaluate, disabled 
                 key={dimension.key}
                 className={cx(
                   'flex flex-col items-center gap-1 rounded-xl border border-border-button-default',
-                  'bg-background-primary-default px-3 py-3'
+                  'bg-background-secondary-default px-3 py-3'
                 )}
               >
                 <span className={cx('text-caption-1-semibold text-text-secondary')}>
