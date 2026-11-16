@@ -1,3 +1,18 @@
 @import "tailwindcss";
 @import "./theme.css";
 @import "./typography.css";
+
+/* Visually hidden but still accessible (file inputs on /chat).
+   BoardUI/replica has no such utility; the class is required by the
+   S3a prompt, so it is defined here rather than in generated code. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

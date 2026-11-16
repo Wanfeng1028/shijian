@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DirectionProvider } from "@/components/boardui/foundations/direction/direction";
 import "../styles/globals.css";
 
 export const metadata: Metadata = {
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <DirectionProvider locale="zh-CN">{children}</DirectionProvider>
+      </body>
     </html>
   );
 }
