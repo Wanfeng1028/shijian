@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习记录 - 史鉴</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    button,
+    .button {
+      min-height: 44px;
+    }
+
+    .records-list > .record-card,
+    .records-list > .record-item,
+    .records-list > article {
+      display: grid;
+      grid-template-columns: 140px minmax(0, 1fr) 160px;
+      gap: 12px 18px;
+    }
+
+    .records-list > .record-card .record-summary,
+    .records-list > .record-item .record-summary,
+    .records-list > article .record-summary {
+      grid-column: 1 / -1;
+    }
+
+    @media (max-width: 390px) {
+      .header-inner,
+      .records-toolbar,
+      .records-list > .record-card,
+      .records-list > .record-item,
+      .records-list > article {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .main-nav {
+        flex-wrap: wrap;
+      }
+
+      .site-header .button,
+      .records-page .button {
+        width: 100%;
+      }
+    }
+  </style>
+  <script src="js/app.js" defer></script>
+  <script src="js/records.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="史鉴首页">
+        <span class="brand-name">史鉴</span>
+        <span class="brand-subtitle">中学历史史料探究学习平台</span>
+      </a>
+
+      <nav class="main-nav" aria-label="主导航">
+        <a class="nav-link" href="index.html">首页</a>
+        <a class="nav-link" href="chat.html">AI 对话</a>
+        <a class="nav-link active" href="records.html" aria-current="page">学习记录</a>
+      </nav>
+
+      <button
+        type="button"
+        class="button button-outline"
+        data-shijian-open-profile
+      >
+        我的学习档案
+      </button>
+    </div>
+  </header>
+
+  <main class="page-main records-page">
+    <section class="records-hero" aria-labelledby="records-title">
+      <h1 id="records-title">学习记录</h1>
+      <p class="page-description">
+        记录你的每一次史料探究。数据保存在本浏览器 localStorage，仅本浏览器有效；清除浏览器数据会丢失，换设备不同步。
+      </p>
+    </section>
+
+    <section class="records-panel" aria-label="学习记录列表">
+      <div class="records-toolbar">
+        <div id="shijian-records-stats" class="records-stats" aria-live="polite">
+          共 0 条记录
+        </div>
+
+        <button
+          type="button"
+          id="shijian-clear-records"
+          class="button button-danger"
+          data-confirm="确定要清空全部学习记录吗？此操作不可恢复。"
+        >
+          清空全部记录
+        </button>
+      </div>
+
+      <div id="shijian-records-list" class="records-list" aria-live="polite">
+        <div class="empty-state">
+          <p>暂无学习记录，去 AI 对话开始一次探究吧。</p>
+          <a class="button button-primary" href="chat.html" role="button">去 AI 对话</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div
+    id="shijian-profile-modal"
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="shijian-profile-title"
+    hidden
+  >
+    <div class="modal-backdrop" data-shijian-close-profile></div>
+
+    <div class="modal-panel">
+      <button
+        type="button"
+        class="modal-close"
+        data-shijian-close-profile
+        aria-label="关闭学习档案"
+      >
+        ×
+      </button>
+
+      <h2 id="shijian-profile-title">我的学习档案</h2>
+
+      <form id="shijian-profile-form" class="profile-form">
+        <div class="form-field">
+          <label for="shijian-profile-grade">年级</label>
+          <input
+            id="shijian-profile-grade"
+            type="text"
+            name="grade"
+            placeholder="如：七年级"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="form-field">
+          <label for="shijian-profile-semester">学期</label>
+          <input
+            id="shijian-profile-semester"
+            type="text"
+            name="semester"
+            placeholder="如：上学期"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="form-field">
+          <label for="shijian-profile-textbook">教材版本</label>
+          <input
+            id="shijian-profile-textbook"
+            type="text"
+            name="textbook"
+            placeholder="如：统编版"
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="form-field">
+          <label for="shijian-profile-progress">学习进度</label>
+          <textarea
+            id="shijian-profile-progress"
+            name="progress"
+            rows="4"
+            placeholder="记录当前学习进度、薄弱专题或目标"
+          ></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button
+            type="button"
+            class="button button-secondary"
+            data-shijian-close-profile
+          >
+            取消
+          </button>
+          <button type="submit" class="button button-primary">保存档案</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

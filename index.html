@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F7F3EC">
+  <title>史鉴 · 高中历史 AI 教学智能体</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="js/app.js" defer></script>
+</head>
+<body>
+  <header class="shijian-topbar">
+    <div class="shijian-topbar__inner">
+      <a class="shijian-brand" href="index.html" aria-label="史鉴首页">
+        <span class="shijian-brand__seal" aria-hidden="true">鉴</span>
+        <span class="shijian-brand__text">
+          <strong>史鉴</strong>
+          <small>高中历史 AI 教学智能体</small>
+        </span>
+      </a>
+
+      <nav class="shijian-nav" aria-label="主导航">
+        <a class="shijian-nav__link shijian-is-active" href="index.html" aria-current="page">首页</a>
+        <a class="shijian-nav__link" href="chat.html?task=reading" data-shijian-task="reading">AI 对话</a>
+        <a class="shijian-nav__link" href="records.html">学习记录</a>
+      </nav>
+
+      <button type="button" class="shijian-button shijian-button--secondary shijian-profile-button" data-shijian-open-profile>
+        我的学习档案
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section class="shijian-hero shijian-container">
+      <span class="shijian-hero__eyebrow">以史料为证据 · 以问题为线索</span>
+      <h1>从史料中发现问题</h1>
+      <p>史鉴以“史料观察→问题发现→问题提出→证据探究→历史解释→反思提升”的六阶段探究法，通过启发式追问引导你运用史料证据形成有依据的历史认识。</p>
+
+      <div class="shijian-feature-grid" aria-label="核心功能入口">
+        <article class="shijian-feature-card" data-shijian-task="reading" role="link" tabindex="0" aria-label="进入史料阅读任务">
+          <span class="shijian-feature-card__icon shijian-feature-card__icon--reading" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 3.8h8.2L19 8.6V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.8a1 1 0 0 1 1-1Z"></path>
+              <path d="M14 4v5h5"></path>
+              <path d="M8 12h8"></path>
+              <path d="M8 15.5h6"></path>
+              <path d="M8 19h4"></path>
+            </svg>
+          </span>
+          <div class="shijian-feature-card__body">
+            <h2>史料阅读</h2>
+            <p>从出处、时间与关键词入手，读懂材料的基本信息。</p>
+          </div>
+          <button type="button" class="shijian-button shijian-button--primary shijian-button--small" data-shijian-task="reading">开始</button>
+        </article>
+
+        <article class="shijian-feature-card" data-shijian-task="analysis" role="link" tabindex="0" aria-label="进入史料辨析任务">
+          <span class="shijian-feature-card__icon shijian-feature-card__icon--analysis" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10.5" cy="10.5" r="5.7"></circle>
+              <path d="m15 15 4.7 4.7"></path>
+              <path d="M8 9.5h5"></path>
+              <path d="M8 12.5h3"></path>
+            </svg>
+          </span>
+          <div class="shijian-feature-card__body">
+            <h2>史料辨析</h2>
+            <p>比较材料差异，发现疑点，判断证据的立场与价值。</p>
+          </div>
+          <button type="button" class="shijian-button shijian-button--primary shijian-button--small" data-shijian-task="analysis">开始</button>
+        </article>
+
+        <article class="shijian-feature-card" data-shijian-task="explanation" role="link" tabindex="0" aria-label="进入历史解释任务">
+          <span class="shijian-feature-card__icon shijian-feature-card__icon--explanation" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 5.5h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-5 3v-3.2a2 2 0 0 1-1-1.8v-6a2 2 0 0 1 1-2Z"></path>
+              <path d="M7.5 10h6"></path>
+              <path d="M7.5 13h4"></path>
+              <path d="M18 7.5h1.5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H19"></path>
+            </svg>
+          </span>
+          <div class="shijian-feature-card__body">
+            <h2>历史解释</h2>
+            <p>把证据放入时空背景，形成条理清晰的历史解释。</p>
+          </div>
+          <button type="button" class="shijian-button shijian-button--primary shijian-button--small" data-shijian-task="explanation">开始</button>
+        </article>
+      </div>
+    </section>
+
+    <section class="shijian-panel shijian-process shijian-container" aria-labelledby="shijian-process-title">
+      <h2 id="shijian-process-title">六阶段探究法</h2>
+      <p class="shijian-panel__lead">一次只聚焦一个思维任务，让问题、证据与解释逐步推进。</p>
+
+      <ol class="shijian-process__list">
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">1</span>
+          <h3>史料观察</h3>
+          <p>读懂材料出处、时间与关键信息。</p>
+        </li>
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">2</span>
+          <h3>问题发现</h3>
+          <p>标记矛盾、空白与值得追问处。</p>
+        </li>
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">3</span>
+          <h3>问题提出</h3>
+          <p>把疑惑整理成可探究的问题。</p>
+        </li>
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">4</span>
+          <h3>证据探究</h3>
+          <p>筛选史料，用证据支持或修正判断。</p>
+        </li>
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">5</span>
+          <h3>历史解释</h3>
+          <p>在时空背景下形成有依据的解释。</p>
+        </li>
+        <li class="shijian-process__step">
+          <span class="shijian-process__number">6</span>
+          <h3>反思提升</h3>
+          <p>回看推理过程，修正认识与方法。</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="shijian-notice shijian-container" aria-label="使用说明">
+      <strong>使用说明：</strong>数据仅保存在本浏览器 localStorage，清除浏览器数据会丢失、换设备不同步。
+    </section>
+  </main>
+
+  <footer class="shijian-footer">
+    史鉴 · 以人教版高中历史教材与《普通高中历史课程标准（2017年版2020年修订）》为依据
+  </footer>
+
+  <div class="shijian-modal" id="shijian-profile-modal" hidden>
+    <div class="shijian-modal__overlay" data-shijian-close-profile></div>
+
+    <section class="shijian-modal__card" role="dialog" aria-modal="true" aria-labelledby="shijian-profile-title" aria-describedby="shijian-profile-desc">
+      <button type="button" class="shijian-modal__close" aria-label="关闭学习档案设置" data-shijian-close-profile>×</button>
+
+      <h2 id="shijian-profile-title">我的学习档案</h2>
+      <p id="shijian-profile-desc">设置你的年级、学期、教材与进度，史鉴会据此调整问题难度与示例范围。</p>
+
+      <form id="shijian-profile-form">
+        <label class="shijian-field">
+          <span>年级</span>
+          <select class="shijian-control" name="grade" required>
+            <option value="高一">高一</option>
+            <option value="高二">高二</option>
+            <option value="高三">高三</option>
+          </select>
+        </label>
+
+        <label class="shijian-field">
+          <span>学期</span>
+          <select class="shijian-control" name="semester" required>
+            <option value="上学期">上学期</option>
+            <option value="下学期">下学期</option>
+          </select>
+        </label>
+
+        <label class="shijian-field">
+          <span>当前教材</span>
+          <select class="shijian-control" name="textbook" required>
+            <option value="《中外历史纲要（上）》">《中外历史纲要（上）》</option>
+            <option value="《中外历史纲要（下）》">《中外历史纲要（下）》</option>
+            <option value="选必一《国家制度与社会治理》">选必一《国家制度与社会治理》</option>
+            <option value="选必二《经济与社会生活》">选必二《经济与社会生活》</option>
+            <option value="选必三《文化交流与传播》">选必三《文化交流与传播》</option>
+          </select>
+        </label>
+
+        <label class="shijian-field">
+          <span>学习进度</span>
+          <input class="shijian-control" type="text" name="progress" placeholder="如：纲要上第 5 课" autocomplete="off">
+        </label>
+
+        <p class="shijian-form-helper">这些信息只保存在当前浏览器的 localStorage 中。</p>
+
+        <div class="shijian-form-actions">
+          <button type="button" class="shijian-button shijian-button--secondary" data-shijian-close-profile>稍后再说</button>
+          <button type="submit" class="shijian-button shijian-button--primary">保存档案</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      var PROFILE_KEY = 'shijian_profile';
+      var TASK_KEY = 'shijian_task';
+      var modal = document.getElementById('shijian-profile-modal');
+      var form = document.getElementById('shijian-profile-form');
+
+      if (!modal || !form) return;
+
+      function safeGet(key) {
+        try { return localStorage.getItem(key); } catch (error) { return null; }
+      }
+
+      function safeSet(key, value) {
+        try {
+          localStorage.setItem(key, value);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function safeSessionSet(key, value) {
+        try { sessionStorage.setItem(key, value); } catch (error) {}
+      }
+
+      function fillForm(profile) {
+        ['grade', 'semester', 'textbook', 'progress'].forEach(function (name) {
+          var field = form.elements[name];
+          if (field && profile && profile[name] !== undefined && profile[name] !== null) {
+            field.value = String(profile[name]);
+          }
+        });
+      }
+
+      function openProfile() {
+        modal.hidden = false;
+        document.body.classList.add('shijian-modal-open');
+        window.requestAnimationFrame(function () {
+          modal.classList.add('shijian-is-open');
+        });
+        window.setTimeout(function () {
+          var firstField = form.querySelector('select, input, button');
+          if (firstField) firstField.focus();
+        }, 0);
+      }
+
+      function closeProfile() {
+        modal.classList.remove('shijian-is-open');
+        modal.hidden = true;
+        document.body.classList.remove('shijian-modal-open');
+      }
+
+      var storedProfile = safeGet(PROFILE_KEY);
+      if (storedProfile === null) {
+        openProfile();
+      } else {
+        try {
+          fillForm(JSON.parse(storedProfile));
+        } catch (error) {
+          fillForm({});
+        }
+      }
+
+      function openTask(taskElement) {
+        var task = taskElement.getAttribute('data-shijian-task');
+        if (!task) return;
+        safeSessionSet(TASK_KEY, task);
+        window.location.href = 'chat.html?task=' + encodeURIComponent(task);
+      }
+
+      document.addEventListener('click', function (event) {
+        var opener = event.target.closest('[data-shijian-open-profile]');
+        if (opener) {
+          event.preventDefault();
+          openProfile();
+          return;
+        }
+
+        var closer = event.target.closest('[data-shijian-close-profile]');
+        if (closer) {
+          event.preventDefault();
+          closeProfile();
+          return;
+        }
+
+        var taskElement = event.target.closest('[data-shijian-task]');
+        if (taskElement) {
+          event.preventDefault();
+          openTask(taskElement);
+        }
+      });
+
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape' && !modal.hidden) {
+          closeProfile();
+          return;
+        }
+
+        var taskElement = event.target;
+        if ((event.key === 'Enter' || event.key === ' ') && taskElement.matches && taskElement.matches('[data-shijian-task][role="link"]')) {
+          event.preventDefault();
+          openTask(taskElement);
+        }
+      });
+
+      window.__shijianProfileBound = true;
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+
+        var formData = new FormData(form);
+        var profile = {
+          grade: String(formData.get('grade') || ''),
+          semester: String(formData.get('semester') || ''),
+          textbook: String(formData.get('textbook') || ''),
+          progress: String(formData.get('progress') || '')
+        };
+
+        if (safeSet(PROFILE_KEY, JSON.stringify(profile))) {
+          closeProfile();
+        } else {
+          window.alert('保存失败：请检查浏览器是否允许本地存储。');
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
