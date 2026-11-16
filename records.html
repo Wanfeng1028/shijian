@@ -11,12 +11,66 @@
       min-height: 44px;
     }
 
-    .records-list > .record-card,
-    .records-list > .record-item,
-    .records-list > article {
-      display: grid;
-      grid-template-columns: 140px minmax(0, 1fr) 160px;
-      gap: 12px 18px;
+    .shijian-records-table {
+      border: 1px solid #ebebeb;
+      border-radius: 16px;
+      overflow-x: auto;
+      background: #ffffff;
+    }
+
+    .shijian-records-table__inner {
+      min-width: 720px;
+    }
+
+    .shijian-records-table__head,
+    .shijian-records-table__row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+    }
+
+    .shijian-records-table__head {
+      border-bottom: 1px solid #ebebeb;
+      font-size: 13px;
+      font-weight: 500;
+      color: #a3a3a3;
+    }
+
+    .shijian-records-table__row {
+      border-bottom: 1px solid #ebebeb;
+      font-size: 14px;
+      color: #0a0a0a;
+    }
+
+    .shijian-records-table__row:hover {
+      background: #f7f7f7;
+    }
+
+    .shijian-records-table__row:last-child {
+      border-bottom: 0;
+    }
+
+    .shijian-records-table__cell--date {
+      flex: 0 0 110px;
+    }
+
+    .shijian-records-table__cell--topic {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .shijian-records-table__cell--task {
+      flex: 0 0 110px;
+    }
+
+    .shijian-records-table__cell--summary {
+      flex: 2 1 0;
+      min-width: 0;
+    }
+
+    .shijian-records-table__row .shijian-records-table__cell--summary {
+      color: #737373;
     }
 
     .records-list > .record-card .record-summary,
@@ -26,21 +80,12 @@
     }
 
     @media (max-width: 390px) {
-      .header-inner,
-      .records-toolbar,
-      .records-list > .record-card,
-      .records-list > .record-item,
-      .records-list > article {
+      .records-toolbar {
         display: flex;
         flex-direction: column;
         align-items: stretch;
       }
 
-      .main-nav {
-        flex-wrap: wrap;
-      }
-
-      .site-header .button,
       .records-page .button {
         width: 100%;
       }
@@ -50,22 +95,25 @@
   <script src="js/records.js" defer></script>
 </head>
 <body>
-  <header class="site-header">
-    <div class="header-inner">
-      <a class="brand" href="index.html" aria-label="史鉴首页">
-        <span class="brand-name">史鉴</span>
-        <span class="brand-subtitle">中学历史史料探究学习平台</span>
+  <header class="shijian-topbar">
+    <div class="shijian-topbar__inner">
+      <a class="shijian-brand" href="index.html" aria-label="史鉴首页">
+        <span class="shijian-brand__seal">鉴</span>
+        <span class="shijian-brand__text">
+          <strong>史鉴</strong>
+          <small>高中历史 AI 教学智能体</small>
+        </span>
       </a>
 
-      <nav class="main-nav" aria-label="主导航">
-        <a class="nav-link" href="index.html">首页</a>
-        <a class="nav-link" href="chat.html">AI 对话</a>
-        <a class="nav-link active" href="records.html" aria-current="page">学习记录</a>
+      <nav class="shijian-nav" aria-label="主导航">
+        <a class="shijian-nav__link" href="index.html">首页</a>
+        <a class="shijian-nav__link" href="chat.html?task=reading" data-shijian-task="reading">AI 对话</a>
+        <a class="shijian-nav__link shijian-is-active" href="records.html" aria-current="page">学习记录</a>
       </nav>
 
       <button
         type="button"
-        class="button button-outline"
+        class="shijian-button shijian-button--secondary shijian-profile-button"
         data-shijian-open-profile
       >
         我的学习档案
@@ -132,6 +180,7 @@
         <div class="form-field">
           <label for="shijian-profile-grade">年级</label>
           <select id="shijian-profile-grade" name="grade" required>
+            <option value="">请选择</option>
             <option value="高一">高一</option>
             <option value="高二">高二</option>
             <option value="高三">高三</option>
@@ -141,6 +190,7 @@
         <div class="form-field">
           <label for="shijian-profile-semester">学期</label>
           <select id="shijian-profile-semester" name="semester" required>
+            <option value="">请选择</option>
             <option value="上学期">上学期</option>
             <option value="下学期">下学期</option>
           </select>
@@ -149,6 +199,7 @@
         <div class="form-field">
           <label for="shijian-profile-textbook">教材版本</label>
           <select id="shijian-profile-textbook" name="textbook" required>
+            <option value="">请选择</option>
             <option value="《中外历史纲要（上）》">《中外历史纲要（上）》</option>
             <option value="《中外历史纲要（下）》">《中外历史纲要（下）》</option>
             <option value="选必一《国家制度与社会治理》">选必一《国家制度与社会治理》</option>

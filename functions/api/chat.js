@@ -171,7 +171,7 @@ export async function onRequestPost(context) {
     return json(503, { error: 'backend_not_configured', message: '后端未配置：未设置 OPENROUTER_API_KEY' });
   }
 
-  async function callOpenRouter(model, msgs, maxTokens) {
+  async function callOpenRouter(model, msgs, maxTokens, timeoutMs = 55000) {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -180,6 +180,7 @@ export async function onRequestPost(context) {
         'HTTP-Referer': 'https://shijian.pages.dev',
         'X-Title': 'shijian'
       },
+      signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         model,
         messages: msgs,
@@ -207,6 +208,89 @@ export async function onRequestPost(context) {
     return { text, model };
   }
 
+  function sseEncode(obj) {
+    return 'data: ' + JSON.stringify(obj) + '\n\n';
+  }
+
+  async function callOpenRouterStream(model, msgs, maxTokens, opts = {}) {
+    const onToken = typeof opts.onToken === 'function' ? opts.onToken : () => {};
+    const firstTokenTimeoutMs = opts.firstTokenTimeoutMs || 10000;
+    const controller = new AbortController();
+    const firstTokenTimer = setTimeout(() => controller.abort(), firstTokenTimeoutMs);
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + apiKey,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://shijian.pages.dev',
+          'X-Title': 'shijian'
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages: msgs,
+          max_tokens: maxTokens,
+          stream: true
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('OpenRouter upstream error with status ' + response.status);
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let fullText = '';
+      let firstTokenReceived = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        let lineEnd;
+        while ((lineEnd = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, lineEnd).trim();
+          buffer = buffer.slice(lineEnd + 1);
+
+          if (!line.startsWith('data:')) continue;
+
+          const dataStr = line.slice(5).trim();
+          if (dataStr === '[DONE]') {
+            break;
+          }
+
+          try {
+            const data = JSON.parse(dataStr);
+            const delta = data && data.choices && data.choices[0] && data.choices[0].delta
+              ? data.choices[0].delta.content
+              : '';
+
+            if (delta) {
+              if (!firstTokenReceived) {
+                firstTokenReceived = true;
+                clearTimeout(firstTokenTimer);
+              }
+              fullText += delta;
+              onToken(delta);
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (!fullText.trim()) {
+        throw new Error('OpenRouter returned empty content');
+      }
+
+      return { text: fullText, model };
+    } finally {
+      clearTimeout(firstTokenTimer);
+    }
+  }
+
   const action = body.action;
 
   if (action === 'chat') {
@@ -215,35 +299,78 @@ export async function onRequestPost(context) {
     messages = appendDocText(messages, body.docText);
 
     const hasImage = typeof body.imageData === 'string' && body.imageData.length > 0;
+    const encoder = new TextEncoder();
 
-    if (hasImage) {
-      try {
-        const visionMessages = withSystem(system, toVisionMessages(messages, body.imageData));
-        const result = await callOpenRouter(VISION, visionMessages, 1500);
-        return json(200, { reply: result.text, model: result.model });
-      } catch (_) {}
-    }
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          if (hasImage) {
+            try {
+              const visionMessages = withSystem(system, toVisionMessages(messages, body.imageData));
+              const result = await callOpenRouter(VISION, visionMessages, 1500);
+              controller.enqueue(encoder.encode(sseEncode({ t: result.text })));
+              controller.enqueue(encoder.encode(sseEncode({ done: true, model: result.model })));
+              return;
+            } catch (_) {}
+          }
 
-    const textMessages = withSystem(system, messages);
-    let result = null;
+          const textMessages = withSystem(system, messages);
+          let tokenSent = false;
 
-    try {
-      result = await callOpenRouter(PRIMARY, textMessages, 1500);
-    } catch (_) {
-      try {
-        result = await callOpenRouter(FALLBACK, textMessages, 1500);
-      } catch (__) {}
-    }
+          try {
+            await callOpenRouterStream(PRIMARY, textMessages, 2000, {
+              onToken(delta) {
+                tokenSent = true;
+                controller.enqueue(encoder.encode(sseEncode({ t: delta })));
+              }
+            });
+            controller.enqueue(encoder.encode(sseEncode({ done: true, model: PRIMARY })));
+            return;
+          } catch (_) {
+            if (tokenSent) {
+              controller.enqueue(encoder.encode(sseEncode({ error: 'upstream_error', message: '上游模型服务暂时不可用，请稍后再试' })));
+              return;
+            }
+          }
 
-    if (result) {
-      return json(200, { reply: result.text, model: result.model });
-    }
+          try {
+            await callOpenRouterStream(FALLBACK, textMessages, 2000, {
+              onToken(delta) {
+                tokenSent = true;
+                controller.enqueue(encoder.encode(sseEncode({ t: delta })));
+              }
+            });
+            controller.enqueue(encoder.encode(sseEncode({ done: true, model: FALLBACK })));
+            return;
+          } catch (__) {
+            if (tokenSent) {
+              controller.enqueue(encoder.encode(sseEncode({ error: 'upstream_error', message: '上游模型服务暂时不可用，请稍后再试' })));
+              return;
+            }
+          }
 
-    if (hasImage) {
-      return json(200, { reply: '图片暂无法解析，请用文字描述关键内容。', model: 'none' });
-    }
+          if (hasImage) {
+            controller.enqueue(encoder.encode(sseEncode({ t: '图片暂无法解析，请用文字描述关键内容。' })));
+            controller.enqueue(encoder.encode(sseEncode({ done: true, model: 'none' })));
+          } else {
+            controller.enqueue(encoder.encode(sseEncode({ error: 'upstream_error', message: '上游模型服务暂时不可用，请稍后再试' })));
+          }
+        } catch (___) {
+          controller.enqueue(encoder.encode(sseEncode({ error: 'upstream_error', message: '上游模型服务暂时不可用，请稍后再试' })));
+        } finally {
+          controller.close();
+        }
+      }
+    });
 
-    return json(502, { error: 'upstream_error', message: '上游模型服务暂时不可用，请稍后再试' });
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
   }
 
   if (action === 'evaluate') {

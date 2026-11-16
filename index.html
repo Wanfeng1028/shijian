@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F7F3EC">
+  <meta name="theme-color" content="#ffffff">
   <title>史鉴 · 高中历史 AI 教学智能体</title>
   <link rel="stylesheet" href="css/styles.css">
   <script src="js/app.js" defer></script>
@@ -40,13 +40,13 @@
       <div class="shijian-feature-grid" aria-label="核心功能入口">
         <article class="shijian-feature-card" data-shijian-task="reading" role="link" tabindex="0" aria-label="进入史料阅读任务">
           <span class="shijian-feature-card__icon shijian-feature-card__icon--reading" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 3.8h8.2L19 8.6V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4.8a1 1 0 0 1 1-1Z"></path>
-              <path d="M14 4v5h5"></path>
-              <path d="M8 12h8"></path>
-              <path d="M8 15.5h6"></path>
-              <path d="M8 19h4"></path>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text" data-lucide="file-text">
+  <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/>
+  <path d="M14 2v5a1 1 0 0 0 1 1h5"/>
+  <path d="M10 9H8"/>
+  <path d="M16 13H8"/>
+  <path d="M16 17H8"/>
+</svg>
           </span>
           <div class="shijian-feature-card__body">
             <h2>史料阅读</h2>
@@ -57,12 +57,10 @@
 
         <article class="shijian-feature-card" data-shijian-task="analysis" role="link" tabindex="0" aria-label="进入史料辨析任务">
           <span class="shijian-feature-card__icon shijian-feature-card__icon--analysis" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="10.5" cy="10.5" r="5.7"></circle>
-              <path d="m15 15 4.7 4.7"></path>
-              <path d="M8 9.5h5"></path>
-              <path d="M8 12.5h3"></path>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search" data-lucide="search">
+  <path d="m21 21-4.34-4.34"/>
+  <circle cx="11" cy="11" r="8"/>
+</svg>
           </span>
           <div class="shijian-feature-card__body">
             <h2>史料辨析</h2>
@@ -73,12 +71,9 @@
 
         <article class="shijian-feature-card" data-shijian-task="explanation" role="link" tabindex="0" aria-label="进入历史解释任务">
           <span class="shijian-feature-card__icon shijian-feature-card__icon--explanation" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 5.5h11a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-5 3v-3.2a2 2 0 0 1-1-1.8v-6a2 2 0 0 1 1-2Z"></path>
-              <path d="M7.5 10h6"></path>
-              <path d="M7.5 13h4"></path>
-              <path d="M18 7.5h1.5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5H19"></path>
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-message-square" data-lucide="message-square">
+  <path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/>
+</svg>
           </span>
           <div class="shijian-feature-card__body">
             <h2>历史解释</h2>
@@ -149,6 +144,7 @@
         <label class="shijian-field">
           <span>年级</span>
           <select class="shijian-control" name="grade" required>
+            <option value="">请选择</option>
             <option value="高一">高一</option>
             <option value="高二">高二</option>
             <option value="高三">高三</option>
@@ -158,6 +154,7 @@
         <label class="shijian-field">
           <span>学期</span>
           <select class="shijian-control" name="semester" required>
+            <option value="">请选择</option>
             <option value="上学期">上学期</option>
             <option value="下学期">下学期</option>
           </select>
@@ -166,6 +163,7 @@
         <label class="shijian-field">
           <span>当前教材</span>
           <select class="shijian-control" name="textbook" required>
+            <option value="">请选择</option>
             <option value="《中外历史纲要（上）》">《中外历史纲要（上）》</option>
             <option value="《中外历史纲要（下）》">《中外历史纲要（下）》</option>
             <option value="选必一《国家制度与社会治理》">选必一《国家制度与社会治理》</option>
@@ -191,66 +189,10 @@
 
   <script>
     (function () {
-      var PROFILE_KEY = 'shijian_profile';
       var TASK_KEY = 'shijian_task';
-      var modal = document.getElementById('shijian-profile-modal');
-      var form = document.getElementById('shijian-profile-form');
-
-      if (!modal || !form) return;
-
-      function safeGet(key) {
-        try { return localStorage.getItem(key); } catch (error) { return null; }
-      }
-
-      function safeSet(key, value) {
-        try {
-          localStorage.setItem(key, value);
-          return true;
-        } catch (error) {
-          return false;
-        }
-      }
 
       function safeSessionSet(key, value) {
         try { sessionStorage.setItem(key, value); } catch (error) {}
-      }
-
-      function fillForm(profile) {
-        ['grade', 'semester', 'textbook', 'progress'].forEach(function (name) {
-          var field = form.elements[name];
-          if (field && profile && profile[name] !== undefined && profile[name] !== null) {
-            field.value = String(profile[name]);
-          }
-        });
-      }
-
-      function openProfile() {
-        modal.hidden = false;
-        document.body.classList.add('shijian-modal-open');
-        window.requestAnimationFrame(function () {
-          modal.classList.add('shijian-is-open');
-        });
-        window.setTimeout(function () {
-          var firstField = form.querySelector('select, input, button');
-          if (firstField) firstField.focus();
-        }, 0);
-      }
-
-      function closeProfile() {
-        modal.classList.remove('shijian-is-open');
-        modal.hidden = true;
-        document.body.classList.remove('shijian-modal-open');
-      }
-
-      var storedProfile = safeGet(PROFILE_KEY);
-      if (storedProfile === null) {
-        openProfile();
-      } else {
-        try {
-          fillForm(JSON.parse(storedProfile));
-        } catch (error) {
-          fillForm({});
-        }
       }
 
       function openTask(taskElement) {
@@ -261,20 +203,6 @@
       }
 
       document.addEventListener('click', function (event) {
-        var opener = event.target.closest('[data-shijian-open-profile]');
-        if (opener) {
-          event.preventDefault();
-          openProfile();
-          return;
-        }
-
-        var closer = event.target.closest('[data-shijian-close-profile]');
-        if (closer) {
-          event.preventDefault();
-          closeProfile();
-          return;
-        }
-
         var taskElement = event.target.closest('[data-shijian-task]');
         if (taskElement) {
           event.preventDefault();
@@ -283,34 +211,10 @@
       });
 
       document.addEventListener('keydown', function (event) {
-        if (event.key === 'Escape' && !modal.hidden) {
-          closeProfile();
-          return;
-        }
-
         var taskElement = event.target;
         if ((event.key === 'Enter' || event.key === ' ') && taskElement.matches && taskElement.matches('[data-shijian-task][role="link"]')) {
           event.preventDefault();
           openTask(taskElement);
-        }
-      });
-
-      window.__shijianProfileBound = true;
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-
-        var formData = new FormData(form);
-        var profile = {
-          grade: String(formData.get('grade') || ''),
-          semester: String(formData.get('semester') || ''),
-          textbook: String(formData.get('textbook') || ''),
-          progress: String(formData.get('progress') || '')
-        };
-
-        if (safeSet(PROFILE_KEY, JSON.stringify(profile))) {
-          closeProfile();
-        } else {
-          window.alert('保存失败：请检查浏览器是否允许本地存储。');
         }
       });
     })();

@@ -328,7 +328,6 @@
     var modal = document.querySelector('#shijian-profile-modal');
     var form;
     var profile;
-    var path;
 
     if (!modal || window.__shijianProfileBound) {
       return;
@@ -360,6 +359,34 @@
       }
     });
 
+    document.addEventListener('keydown', function (event) {
+      var style;
+      var isOpen;
+
+      if (event.key !== 'Escape' && event.keyCode !== 27) {
+        return;
+      }
+
+      isOpen = false;
+      if (modal.classList && (
+        modal.classList.contains('is-open') ||
+        modal.classList.contains('open') ||
+        modal.classList.contains('show') ||
+        modal.classList.contains('active')
+      )) {
+        isOpen = true;
+      }
+
+      if (!isOpen && !modal.hidden && modal.getAttribute('aria-hidden') !== 'true') {
+        style = window.getComputedStyle(modal);
+        isOpen = style.display !== 'none' && style.visibility !== 'hidden' && modal.getClientRects().length > 0;
+      }
+
+      if (isOpen) {
+        closeProfileModal(modal);
+      }
+    });
+
     modal.addEventListener('click', function (event) {
       if (event.target === modal) {
         closeProfileModal(modal);
@@ -369,16 +396,31 @@
     form = modal.querySelector('form');
     if (form) {
       form.addEventListener('submit', function (event) {
+        var savedProfile;
+        var gradeSelect;
+        var textbookSelect;
+
         event.preventDefault();
-        window.ShijianStore.saveProfile(collectProfile(modal));
+        savedProfile = collectProfile(modal);
+        window.ShijianStore.saveProfile(savedProfile);
+
+        gradeSelect = document.querySelector('select#shijian-grade');
+        textbookSelect = document.querySelector('select#shijian-textbook');
+
+        if (gradeSelect && savedProfile.grade) {
+          gradeSelect.value = savedProfile.grade;
+        }
+        if (textbookSelect && savedProfile.textbook) {
+          textbookSelect.value = savedProfile.textbook;
+        }
+
         closeProfileModal(modal);
       });
     }
 
     profile = window.ShijianStore.loadProfile();
-    path = window.location.pathname || '';
 
-    if (!profile && (path === '/' || /\/index\.html$/i.test(path))) {
+    if (!profile) {
       openProfileModal(modal);
     }
   }

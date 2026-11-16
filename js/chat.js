@@ -228,12 +228,12 @@
     gradeEl = document.querySelector('#shijian-grade');
     textbookEl = document.querySelector('#shijian-textbook');
 
-    if (gradeEl && profile.grade) {
-      gradeEl.value = profile.grade;
+    if (gradeEl) {
+      gradeEl.value = profile.grade || '';
     }
 
-    if (textbookEl && profile.textbook) {
-      textbookEl.value = profile.textbook;
+    if (textbookEl) {
+      textbookEl.value = profile.textbook || '';
     }
 
     updateTaskDesc();
@@ -246,6 +246,37 @@
 
 function setStatus(text) {
   document.getElementById('shijian-status').textContent = text;
+}
+
+function shijianGetMessagesContainer() {
+  return document.getElementById('shijian-messages') ||
+    document.querySelector('.shijian-messages') ||
+    document.querySelector('.shijian-message-list') ||
+    (function () {
+      const existing = document.querySelector('.shijian-message');
+      return existing ? existing.parentNode : null;
+    })();
+}
+
+function shijianRenderStreamBubble(bubble, content) {
+  bubble.textContent = '';
+  String(content).split('\n\n').forEach(function (part) {
+    const p = document.createElement('p');
+    p.textContent = part;
+    bubble.appendChild(p);
+  });
+}
+
+function shijianCreateStreamBubble() {
+  const bubble = document.createElement('div');
+  bubble.className = 'shijian-message shijian-message--ai';
+  shijianRenderStreamBubble(bubble, '史鉴正在思考…');
+
+  const container = shijianGetMessagesContainer();
+  if (container) container.appendChild(bubble);
+  scrollMessagesToBottom();
+
+  return bubble;
 }
 
 async function sendMessage() {
@@ -272,53 +303,228 @@ async function sendMessage() {
   if (pendingImage) body.imageData = pendingImage;
   if (pendingDocText) body.docText = pendingDocText;
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(function () {
-    controller.abort();
-  }, 60000);
-  let succeeded = false;
+  const maxAttempts = 2;
 
-  try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    const data = await response.json();
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let succeeded = false;
+    let fatalError = false;
+    let streamBubble = null;
+    const controller = new AbortController();
+    let stallTimerId = null;
 
-    if (data && data.reply) {
-      addMessage('ai', data.reply);
+    const armStallTimer = function () {
+      if (stallTimerId !== null) clearTimeout(stallTimerId);
+      stallTimerId = setTimeout(function () {
+        controller.abort();
+      }, 30000);
+    };
 
-      if (window.ShijianStore && typeof window.ShijianStore.saveRecord === 'function') {
-        window.ShijianStore.saveRecord({
-          date: new Date().toISOString(),
-          topic: body.topic || text.slice(0, 20),
-          task: currentTask,
-          summary: String(data.reply).slice(0, 60)
-        });
+    const clearStallTimer = function () {
+      if (stallTimerId !== null) {
+        clearTimeout(stallTimerId);
+        stallTimerId = null;
       }
+    };
 
-      pendingImage = null;
-      pendingDocText = null;
-      document.getElementById('shijian-image-preview').textContent = '';
-      document.getElementById('shijian-doc-name').textContent = '';
-      document.getElementById('shijian-image-input').value = '';
-      document.getElementById('shijian-doc-input').value = '';
-      succeeded = true;
-    } else if (data && data.error === 'backend_not_configured') {
-      setStatus('后端未配置：请联系管理员配置 OPENROUTER_API_KEY 后再试');
-    } else if (data && data.error === 'rate_limited') {
-      setStatus('请求太频繁，请稍后再试');
-    } else {
-      setStatus('服务暂时不可用，请稍后再试');
+    const removeStreamBubble = function () {
+      if (streamBubble && streamBubble.parentNode) {
+        streamBubble.parentNode.removeChild(streamBubble);
+      }
+    };
+
+    if (attempt > 0) {
+      input.value = '';
+      setStatus('史鉴正在思考…');
     }
-  } catch (error) {
-    setStatus('服务暂时不可用，请稍后再试');
-  } finally {
-    clearTimeout(timeoutId);
-    sendBtn.disabled = false;
-    if (succeeded) setStatus('');
+
+    streamBubble = shijianCreateStreamBubble();
+    armStallTimer();
+
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal
+      });
+
+      const contentType = response.headers.get('Content-Type') || '';
+
+      if (contentType.indexOf('application/json') !== -1) {
+        const data = await response.json();
+
+        if (data && data.reply) {
+          removeStreamBubble();
+          addMessage('ai', data.reply);
+
+          if (window.ShijianStore && typeof window.ShijianStore.saveRecord === 'function') {
+            window.ShijianStore.saveRecord({
+              date: new Date().toISOString(),
+              topic: body.topic || text.slice(0, 20),
+              task: currentTask,
+              summary: String(data.reply).slice(0, 60)
+            });
+          }
+
+          pendingImage = null;
+          pendingDocText = null;
+          document.getElementById('shijian-image-preview').textContent = '';
+          document.getElementById('shijian-doc-name').textContent = '';
+          document.getElementById('shijian-image-input').value = '';
+          document.getElementById('shijian-doc-input').value = '';
+          succeeded = true;
+        } else if (data && data.error === 'backend_not_configured') {
+          fatalError = true;
+          removeStreamBubble();
+          input.value = text;
+          setStatus('后端未配置：请联系管理员配置 OPENROUTER_API_KEY 后再试');
+        } else if (data && data.error === 'rate_limited') {
+          fatalError = true;
+          removeStreamBubble();
+          input.value = text;
+          setStatus('请求太频繁，请稍后再试');
+        } else {
+          throw new Error('invalid json response');
+        }
+      } else if (contentType.indexOf('text/event-stream') !== -1) {
+        if (!response.body || typeof response.body.getReader !== 'function') {
+          throw new Error('stream unsupported');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let fullText = '';
+        let gotFirstToken = false;
+        let streamDone = false;
+
+        while (!streamDone) {
+          const result = await reader.read();
+
+          if (result.done) {
+            break;
+          }
+
+          armStallTimer();
+
+          buffer += decoder.decode(result.value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (let i = 0; i < lines.length; i += 1) {
+            let line = lines[i];
+
+            if (line.charAt(line.length - 1) === '\r') {
+              line = line.slice(0, -1);
+            }
+
+            if (!line || line.charAt(0) === ':') {
+              continue;
+            }
+
+            if (line.indexOf('event:') === 0) {
+              if (line.slice(6).trim() === 'error') {
+                throw new Error('SSE error event');
+              }
+              continue;
+            }
+
+            if (line.indexOf('data:') !== 0) {
+              continue;
+            }
+
+            let raw = line.slice(5);
+            if (raw.charAt(0) === ' ') {
+              raw = raw.slice(1);
+            }
+
+            if (!raw.trim()) {
+              continue;
+            }
+
+            let msg;
+            try {
+              msg = JSON.parse(raw);
+            } catch (parseError) {
+              throw parseError;
+            }
+
+            if (msg && Object.prototype.hasOwnProperty.call(msg, 'error')) {
+              throw new Error('SSE error payload');
+            }
+
+            if (msg && Object.prototype.hasOwnProperty.call(msg, 't')) {
+              if (!gotFirstToken) {
+                gotFirstToken = true;
+                setStatus('史鉴正在回答…');
+              }
+
+              fullText += String(msg.t);
+              shijianRenderStreamBubble(streamBubble, fullText);
+            }
+
+            if (msg && Object.prototype.hasOwnProperty.call(msg, 'done')) {
+              streamDone = true;
+              break;
+            }
+          }
+        }
+
+        if (!streamDone) {
+          throw new Error('SSE ended without done');
+        }
+
+        shijianRenderStreamBubble(streamBubble, fullText);
+        scrollMessagesToBottom();
+
+        messages.push({ role: 'ai', content: fullText });
+
+        if (window.ShijianStore && typeof window.ShijianStore.saveRecord === 'function') {
+          window.ShijianStore.saveRecord({
+            date: new Date().toISOString(),
+            topic: body.topic || text.slice(0, 20),
+            task: currentTask,
+            summary: String(fullText).slice(0, 60)
+          });
+        }
+
+        pendingImage = null;
+        pendingDocText = null;
+        document.getElementById('shijian-image-preview').textContent = '';
+        document.getElementById('shijian-doc-name').textContent = '';
+        document.getElementById('shijian-image-input').value = '';
+        document.getElementById('shijian-doc-input').value = '';
+        succeeded = true;
+      } else {
+        throw new Error('unsupported content type');
+      }
+    } catch (error) {
+      if (!fatalError) {
+        removeStreamBubble();
+        input.value = text;
+      }
+    } finally {
+      clearStallTimer();
+    }
+
+    if (succeeded) {
+      setStatus('');
+      sendBtn.disabled = false;
+      return;
+    }
+
+    if (fatalError) {
+      sendBtn.disabled = false;
+      return;
+    }
+
+    if (attempt === maxAttempts - 1) {
+      setStatus('服务暂时不可用，请稍后再试');
+      sendBtn.disabled = false;
+      return;
+    }
+
+    setStatus('史鉴正在思考…');
   }
 }
 

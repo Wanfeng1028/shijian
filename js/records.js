@@ -42,12 +42,6 @@
     return key;
   }
 
-  function appendTextItem(parent, label, value) {
-    var item = document.createElement('p');
-    item.textContent = label + value;
-    parent.appendChild(item);
-  }
-
   function renderRecords() {
     var list = document.getElementById('shijian-records-list');
     var stats = document.getElementById('shijian-records-stats');
@@ -77,21 +71,46 @@
       return;
     }
 
+    function createCell(parent, className, value) {
+      var cell = document.createElement('span');
+      cell.className = className;
+      cell.textContent = value;
+      parent.appendChild(cell);
+    }
+
+    var table = document.createElement('div');
+    table.className = 'shijian-records-table';
+
+    var inner = document.createElement('div');
+    inner.className = 'shijian-records-table__inner';
+    table.appendChild(inner);
+
+    var head = document.createElement('div');
+    head.className = 'shijian-records-table__head';
+    createCell(head, 'shijian-records-table__cell--date', '日期');
+    createCell(head, 'shijian-records-table__cell--topic', '主题');
+    createCell(head, 'shijian-records-table__cell--task', '任务类型');
+    createCell(head, 'shijian-records-table__cell--summary', '摘要');
+    inner.appendChild(head);
+
     records.forEach(function (record) {
-      var article = document.createElement('article');
+      var row = document.createElement('div');
+      row.className = 'shijian-records-table__row';
 
       var dateValue = pickValue(record, ['date', 'createdAt', 'created_at', 'iso', 'timestamp']);
       var topicValue = pickValue(record, ['topic', 'title', 'subject', 'theme', 'question', 'prompt']);
       var taskValue = pickValue(record, ['taskType', 'task_type', 'type', 'task']);
       var summaryValue = pickValue(record, ['summary', 'excerpt', 'abstract', 'answer', 'content', 'note']);
 
-      appendTextItem(article, '日期：', formatDate(dateValue));
-      appendTextItem(article, '主题：', topicValue);
-      appendTextItem(article, '任务类型：', getTaskLabel(taskValue));
-      appendTextItem(article, '摘要：', summaryValue);
+      createCell(row, 'shijian-records-table__cell--date', formatDate(dateValue));
+      createCell(row, 'shijian-records-table__cell--topic', topicValue);
+      createCell(row, 'shijian-records-table__cell--task', getTaskLabel(taskValue));
+      createCell(row, 'shijian-records-table__cell--summary', summaryValue);
 
-      list.appendChild(article);
+      inner.appendChild(row);
     });
+
+    list.appendChild(table);
   }
 
   function init() {
