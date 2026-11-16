@@ -131,35 +131,30 @@
       <form id="shijian-profile-form" class="profile-form">
         <div class="form-field">
           <label for="shijian-profile-grade">年级</label>
-          <input
-            id="shijian-profile-grade"
-            type="text"
-            name="grade"
-            placeholder="如：七年级"
-            autocomplete="off"
-          >
+          <select id="shijian-profile-grade" name="grade" required>
+            <option value="高一">高一</option>
+            <option value="高二">高二</option>
+            <option value="高三">高三</option>
+          </select>
         </div>
 
         <div class="form-field">
           <label for="shijian-profile-semester">学期</label>
-          <input
-            id="shijian-profile-semester"
-            type="text"
-            name="semester"
-            placeholder="如：上学期"
-            autocomplete="off"
-          >
+          <select id="shijian-profile-semester" name="semester" required>
+            <option value="上学期">上学期</option>
+            <option value="下学期">下学期</option>
+          </select>
         </div>
 
         <div class="form-field">
           <label for="shijian-profile-textbook">教材版本</label>
-          <input
-            id="shijian-profile-textbook"
-            type="text"
-            name="textbook"
-            placeholder="如：统编版"
-            autocomplete="off"
-          >
+          <select id="shijian-profile-textbook" name="textbook" required>
+            <option value="《中外历史纲要（上）》">《中外历史纲要（上）》</option>
+            <option value="《中外历史纲要（下）》">《中外历史纲要（下）》</option>
+            <option value="选必一《国家制度与社会治理》">选必一《国家制度与社会治理》</option>
+            <option value="选必二《经济与社会生活》">选必二《经济与社会生活》</option>
+            <option value="选必三《文化交流与传播》">选必三《文化交流与传播》</option>
+          </select>
         </div>
 
         <div class="form-field">
