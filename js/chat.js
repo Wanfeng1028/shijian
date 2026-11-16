@@ -316,7 +316,7 @@ async function sendMessage() {
       if (stallTimerId !== null) clearTimeout(stallTimerId);
       stallTimerId = setTimeout(function () {
         controller.abort();
-      }, 30000);
+      }, 45000);
     };
 
     const clearStallTimer = function () {

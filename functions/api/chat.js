@@ -214,7 +214,7 @@ export async function onRequestPost(context) {
 
   async function callOpenRouterStream(model, msgs, maxTokens, opts = {}) {
     const onToken = typeof opts.onToken === 'function' ? opts.onToken : () => {};
-    const firstTokenTimeoutMs = opts.firstTokenTimeoutMs || 10000;
+    const firstTokenTimeoutMs = opts.firstTokenTimeoutMs || 20000;
     const controller = new AbortController();
     const firstTokenTimer = setTimeout(() => controller.abort(), firstTokenTimeoutMs);
 
