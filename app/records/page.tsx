@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 
 import { loadRecords, clearRecords, loadProfile, saveProfile } from '@/lib/store';
 import type { Profile, RecordItem } from '@/lib/store';
-import { Topbar } from '@/components/shijian/topbar';
+import { RecordsShell } from '@/components/shijian/records-shell';
+import { ProfileModal } from '@/components/shijian/chat/profile-modal';
+
 import { Select, SelectItem } from '@/components/boardui/base/select/select';
+
 import { Button, ButtonLink } from '@/components/boardui/base/buttons/button';
 import { AlertDialog } from '@/components/boardui/base/modal/modal';
 import { cx } from '@/utils/cx';
@@ -32,6 +35,8 @@ export default function RecordsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+
 
   useEffect(() => {
     setRecords(loadRecords());
@@ -49,19 +54,28 @@ export default function RecordsPage() {
   };
 
   const filtered = filter === 'all' ? records : records.filter((r) => r.task === filter);
-  const visible = [...filtered].reverse();
-
+  const visible = filtered.toReversed();
   return (
-    <div className="min-h-screen bg-background-full">
-      <Topbar current="records" initialProfile={profile} onProfileSaved={handleProfileSaved} />
+    <RecordsShell
+      title="学习记录"
+      profile={profile}
+      onOpenProfile={() => setProfileOpen(true)}
+      actions={
+        <Button
+          variant="danger"
+          size="medium"
+          disabled={records.length === 0}
+          onClick={() => setConfirmOpen(true)}
+        >
+          清空全部记录
+        </Button>
+      }
+    >
+      <div className="flex w-full flex-col gap-4">
+        <p className="px-1 text-body-regular text-text-secondary">
+          记录你的每一次史料探究。数据保存在本浏览器 localStorage，仅本浏览器有效；清除浏览器数据会丢失，换设备不同步。
+        </p>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 sm:px-6">
-        <header>
-          <h1 className="text-title-1-medium text-text-primary">学习记录</h1>
-          <p className="mt-2 text-body-regular text-text-secondary">
-            记录你的每一次史料探究。数据保存在本浏览器 localStorage，仅本浏览器有效；清除浏览器数据会丢失，换设备不同步。
-          </p>
-        </header>
 
         <section className="rounded-2xl border border-border-table bg-background-primary-default pt-2 pb-3">
           <div
@@ -88,14 +102,7 @@ export default function RecordsPage() {
                 <SelectItem id="analysis" textValue="史料辨析">史料辨析</SelectItem>
                 <SelectItem id="explanation" textValue="历史解释">历史解释</SelectItem>
               </Select>
-              <Button
-                variant="danger"
-                size="medium"
-                disabled={records.length === 0}
-                onClick={() => setConfirmOpen(true)}
-              >
-                清空全部记录
-              </Button>
+
             </div>
           </div>
 
@@ -116,7 +123,8 @@ export default function RecordsPage() {
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" role="region" tabIndex={0} aria-label="学习记录表">
+
               <div className="min-w-[720px]">
                 <div className="flex border-b border-border-table px-3 py-2 text-body-2-medium text-text-tertiary">
                   <div className="w-[110px] shrink-0">日期</div>
@@ -150,7 +158,17 @@ export default function RecordsPage() {
             </div>
           )}
         </section>
-      </main>
+      </div>
+
+      <ProfileModal
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        initial={profile}
+        onSaved={(next) => {
+          handleProfileSaved(next);
+          setProfileOpen(false);
+        }}
+      />
 
       <AlertDialog
         isOpen={confirmOpen}
@@ -162,6 +180,7 @@ export default function RecordsPage() {
         variant="danger"
         onConfirm={handleConfirmClear}
       />
-    </div>
+    </RecordsShell>
   );
 }
+
