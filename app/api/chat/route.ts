@@ -14,8 +14,8 @@ export const runtime = 'edge';
 
 const RATE = new Map<string, number[]>();
 
-const PRIMARY = 'glm-5.3';
-const FALLBACK = 'spark-x2.6';
+const PRIMARY = 'spark-x2.6';
+const FALLBACK = 'qiniu/conatus-free';
 
 type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
