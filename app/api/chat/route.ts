@@ -126,7 +126,13 @@ async function callOpenRouterStream(
   const onToken: (delta: string) => void = typeof opts.onToken === 'function' ? opts.onToken : () => {};
   const firstTokenTimeoutMs = opts.firstTokenTimeoutMs || 20000;
   const controller = new AbortController();
-  const firstTokenTimer = setTimeout(() => controller.abort(), firstTokenTimeoutMs);
+  let firstTokenTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+  const resetActivityTimer: () => void = () => {
+    if (firstTokenTimer !== undefined) clearTimeout(firstTokenTimer);
+    firstTokenTimer = setTimeout(() => controller.abort(), firstTokenTimeoutMs);
+  };
+  resetActivityTimer();
+  const totalTimer = setTimeout(() => controller.abort(), 55000);
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -182,16 +188,19 @@ async function callOpenRouterStream(
 
         try {
           const data = JSON.parse(dataStr) as any;
-          const delta = data && data.choices && data.choices[0] && data.choices[0].delta
-            ? data.choices[0].delta.content
-            : '';
+          const deltaObj = data && data.choices && data.choices[0] && data.choices[0].delta
+            ? data.choices[0].delta
+            : {};
+          const delta = deltaObj && deltaObj.content ? deltaObj.content : '';
+          const reasoning = deltaObj && deltaObj.reasoning ? deltaObj.reasoning : '';
+          const reasoningContent = deltaObj && deltaObj.reasoning_content ? deltaObj.reasoning_content : '';
+
+          if (delta || reasoning || reasoningContent) {
+            resetActivityTimer();
+            firstTokenReceived = true;
+          }
 
           if (delta) {
-            if (!firstTokenReceived) {
-              firstTokenReceived = true;
-              clearTimeout(firstTokenTimer);
-            }
-
             const tokenText = typeof delta === 'string' ? delta : String(delta);
             fullText += tokenText;
             onToken(tokenText);
@@ -206,7 +215,8 @@ async function callOpenRouterStream(
 
     return { text: fullText, model };
   } finally {
-    clearTimeout(firstTokenTimer);
+    if (firstTokenTimer !== undefined) clearTimeout(firstTokenTimer);
+    clearTimeout(totalTimer);
   }
 }
 
@@ -291,16 +301,28 @@ export async function POST(request: Request): Promise<Response> {
             }
           }
 
-          try {
+          const runFallback = async () => {
             await callOpenRouterStream(apiKey, FALLBACK, textMessages, 2000, {
+              firstTokenTimeoutMs: 30000,
               onToken(delta) {
                 tokenSent = true;
                 controller.enqueue(encoder.encode(sseEncode({ t: delta })));
               }
             });
+          };
+          try {
+            await runFallback();
             controller.enqueue(encoder.encode(sseEncode({ done: true, model: FALLBACK })));
             return;
-          } catch (__) {
+          } catch (firstErr) {
+            if (!tokenSent && firstErr instanceof Error && firstErr.message.includes('429')) {
+              await new Promise((resolve) => setTimeout(resolve, 4000));
+              try {
+                await runFallback();
+                controller.enqueue(encoder.encode(sseEncode({ done: true, model: FALLBACK })));
+                return;
+              } catch (__) {}
+            }
             if (tokenSent) {
               controller.enqueue(encoder.encode(sseEncode({
                 error: 'upstream_error',
