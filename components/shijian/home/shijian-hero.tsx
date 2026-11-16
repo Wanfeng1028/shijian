@@ -124,8 +124,7 @@ export function ShijianHero({ onStartTask }: ShijianHeroProps) {
               );
             })}
           </div>
-          <div className="relative bg-background-secondary-default px-4 py-6 sm:px-6">
-            <h3 className="text-title-2-medium text-text-primary">{tab.label}</h3>
+          <div className="relative h-[480px] bg-background-secondary-default px-4 py-6 sm:h-[560px] sm:px-6">            <h3 className="text-title-2-medium text-text-primary">{tab.label}</h3>
             <p className="mt-2 max-w-2xl text-body-regular text-text-secondary">{tab.desc}</p>
             <ul className="mt-4 flex flex-col gap-2">
               {tab.quick.map((question) => (
