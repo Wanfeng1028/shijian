@@ -98,7 +98,7 @@ export async function verifySession(value: string | null | undefined, secret: st
   if (!Number.isFinite(exp)) return null;
   const data = userId + '.' + expStr;
   const expectedSig = await hmacSign(data, secret);
-  if (expectedSig !== sig) return null;
+  if (!constantTimeEqual(new TextEncoder().encode(expectedSig), new TextEncoder().encode(sig))) return null;
   if (Date.now() / 1000 > exp) return null;
   return userId;
 }

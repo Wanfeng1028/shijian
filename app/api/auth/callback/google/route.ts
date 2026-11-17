@@ -103,33 +103,38 @@ export async function GET(request: Request) {
     );
   }
 
-  const db = getRequestContext().env.DB;
-  const existing = await db
-    .prepare('SELECT id FROM users WHERE google_sub = ?')
-    .bind(userinfo.sub)
-    .first<{ id: string }>();
-
   let userId: string;
-  if (existing) {
-    userId = existing.id;
-  } else {
-    userId = crypto.randomUUID();
-    await db
-      .prepare(
-        'INSERT INTO users (id, google_sub, email, name, avatar, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      )
-      .bind(
-        userId,
-        userinfo.sub,
-        userinfo.email ?? null,
-        userinfo.name ?? null,
-        userinfo.picture ?? null,
-        null,
-        Math.floor(Date.now() / 1000)
-      )
-      .run();
-  }
+  try {
+    const db = getRequestContext().env.DB;
+    const existing = await db
+      .prepare('SELECT id FROM users WHERE google_sub = ?')
+      .bind(userinfo.sub)
+      .first<{ id: string }>();
 
+    if (existing) {
+      userId = existing.id;
+    } else {
+      userId = crypto.randomUUID();
+      await db
+        .prepare(
+          'INSERT INTO users (id, google_sub, email, name, avatar, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(
+          userId,
+          userinfo.sub,
+          userinfo.email ?? null,
+          userinfo.name ?? null,
+          userinfo.picture ?? null,
+          null,
+          Math.floor(Date.now() / 1000)
+        )
+        .run();
+    }
+  } catch {
+    return NextResponse.redirect(
+      new URL('/login?error=db_failed', request.url)
+    );
+  }
   const sessionValue = await createSession(userId, sessionSecret);
   const response = NextResponse.redirect(new URL('/chat', request.url));
   response.headers.set('Set-Cookie', sessionCookieHeader(sessionValue));
