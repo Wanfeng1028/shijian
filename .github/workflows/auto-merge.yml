@@ -2,11 +2,7 @@ name: auto-merge
 
 on:
   pull_request_target:
-    types:
-      - opened
-      - reopened
-      - ready_for_review
-      - synchronize
+    types: [opened, reopened, ready_for_review, synchronize]
 
 permissions:
   pull-requests: write
@@ -14,10 +10,10 @@ permissions:
   workflows: write
 
 jobs:
-  auto-merge:
+  merge:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve conflicts
+      - name: Auto-resolve conflicts
         continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
