@@ -456,7 +456,7 @@ function ChatPageInner() {
                   e.target.value = '';
                 }}
               />
-              <p className="mt-2 hidden text-caption-1-semibold text-text-tertiary sm:block">
+              <p className="mt-2 hidden text-caption-1-semibold text-text-tertiary text-center sm:block">
                 纯文本文档可直接读取，PDF / Word 若无法读取正文，请复制粘贴文字。
               </p>
             </div>
