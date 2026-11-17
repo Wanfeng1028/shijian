@@ -181,7 +181,7 @@ export default function LoginPage() {
       <dialog
         ref={dialogRef}
         aria-labelledby="login-dialog-title"
-        className="w-[calc(100vw-3rem)] max-w-[400px] rounded-3xl border border-border-button-default bg-background-primary-default p-6 text-text-primary"
+        className="m-auto w-[calc(100vw-3rem)] max-w-[400px] rounded-3xl border border-border-button-default bg-background-primary-default p-6 text-text-primary"
       >
         <h2 id="login-dialog-title" className="text-body-medium text-text-primary">
           暂时没开放
