@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { BookOpenText, Home, Menu, MessagesSquare, UserRound, X } from 'lucide-react';
 import { Button } from '@/components/boardui/base/buttons/button';
+import { AuthEntry } from '@/components/shijian/auth-entry';
 import type { Profile } from '@/lib/store';
 import { cx } from '@/utils/cx';
 import { HomeDrawer } from './home-drawer';
@@ -68,6 +69,7 @@ export function HomeHeader({ current, profile: _profile, onOpenProfile }: HomeHe
               <UserRound className="h-4 w-4" aria-hidden />
               我的学习档案
             </Button>
+            <AuthEntry variant="header" />
             <button
               type="button"
               className="rounded-md p-2 text-text-secondary outline-none hover:bg-background-tertiary-default hover:text-text-primary focus-visible:ring-2 focus-visible:ring-border-focus-ring md:hidden"

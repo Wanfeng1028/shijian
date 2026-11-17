@@ -249,6 +249,45 @@ export async function isLoggedIn(): Promise<boolean> {
   }
 }
 
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  avatar: string | null
+}
+
+export async function loadAuthUser(): Promise<AuthUser | null> {
+  try {
+    if (typeof window === 'undefined') return null
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+    if (!res.ok) return null
+    const data: unknown = await res.json()
+    if (!isRecord(data)) return null
+    if (!isRecord(data.user)) return null
+    return {
+      id: toStr(data.user.id),
+      email: toStr(data.user.email),
+      name: toStr(data.user.name),
+      avatar: typeof data.user.avatar === 'string' ? data.user.avatar : null
+    }
+  } catch {
+    return null
+  }
+}
+
+export async function logout(): Promise<boolean> {
+  try {
+    if (typeof window === 'undefined') return false
+    const res = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin'
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 async function postConversation(rec: RecordItem): Promise<boolean> {
   try {
     if (!(await isLoggedIn())) return false
