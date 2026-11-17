@@ -11,7 +11,8 @@ import { EvaluateCard } from '@/components/shijian/chat/evaluate-card';
 import { ChatSidebar } from '@/components/shijian/chat/chat-sidebar';
 import { HistoryRail } from '@/components/shijian/chat/history-rail';
 import { TASK_META, TASK_ORDER, type TaskId } from '@/components/shijian/chat/task-meta';
-import { CharacterPicker } from '@/components/shijian/chat/character-picker';
+import { CharacterRoster } from '@/components/shijian/chat/character-roster';
+import { AgentAvatar, avatarForCharacter } from '@/components/shijian/chat/character-avatar';
 import { useShijianChat } from '@/components/shijian/chat/use-shijian-chat';
 import { loadRecords, loadTask } from '@/lib/store';
 import { AgentChatActions } from '@/components/boardui/application/agent-chat/agent-chat-actions';
@@ -53,6 +54,7 @@ function ChatPageInner() {
   const restoredRef = useRef(false);
   const [initialTask] = useState<TaskId>(() => resolveInitialTask(taskParam));
   const [navOpen, setNavOpen] = useState(false);
+  const [rosterOpen, setRosterOpen] = useState(false);
 
   const chat = useShijianChat(initialTask);
   const {
@@ -195,6 +197,15 @@ function ChatPageInner() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [navOpen]);
 
+  useEffect(() => {
+    if (!rosterOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setRosterOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [rosterOpen]);
+
   const hideEval = useCallback(() => {
     if (evalTimerRef.current) {
       clearTimeout(evalTimerRef.current);
@@ -263,6 +274,12 @@ function ChatPageInner() {
         {sidebar}
       </div>
 
+      {currentTask === 'roleplay' ? (
+        <div className="hidden lg:flex lg:h-full lg:shrink-0">
+          <CharacterRoster selectedId={character} onSelect={setCharacter} busy={busy} />
+        </div>
+      ) : null}
+
       {/* Below lg the sidebar rides in as an overlay drawer. The Pro template
           pushes the workspace across instead; this is the plain version. */}
       {navOpen && (
@@ -292,6 +309,24 @@ function ChatPageInner() {
                 setNavOpen(false);
               }}
               className="flex"
+            />
+          </div>
+        </div>
+      )}
+
+      {rosterOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <button
+            type="button"
+            aria-label="关闭人物列表"
+            onClick={() => setRosterOpen(false)}
+            className="absolute inset-0 cursor-pointer bg-black/40"
+          />
+          <div className="relative flex h-full p-3">
+            <CharacterRoster
+              selectedId={character}
+              onSelect={(figure) => { setCharacter(figure); setRosterOpen(false); }}
+              busy={busy}
             />
           </div>
         </div>
@@ -368,6 +403,11 @@ function ChatPageInner() {
                       </button>
                     ))}
                   </div>
+                  {currentTask === 'roleplay' && !roleplayFigure ? (
+                    <div className="mt-2 flex w-full justify-center lg:hidden">
+                      <CharacterRoster selectedId={character} onSelect={setCharacter} busy={busy} />
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 messages.map((m, i) => (
@@ -436,8 +476,20 @@ function ChatPageInner() {
                 </div>
               ) : null}
 
-              {currentTask === 'roleplay' ? (
-                <CharacterPicker selectedId={character} onSelect={setCharacter} busy={busy} />
+              {currentTask === 'roleplay' && roleplayFigure ? (
+                <div className="mb-2 flex items-center gap-2.5 rounded-2xl border border-border-button-default bg-background-primary-default p-2">
+                  <AgentAvatar agent={avatarForCharacter(roleplayFigure.id, roleplayFigure.name)} size={32} />
+                  <span className="min-w-0 flex-1 truncate text-body-medium text-text-primary">
+                    {roleplayFigure.name} · {roleplayFigure.era}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRosterOpen(true)}
+                    className="shrink-0 cursor-pointer rounded-full px-3 py-1.5 text-body-2-regular text-text-secondary outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring lg:hidden"
+                  >
+                    换人
+                  </button>
+                </div>
               ) : null}
 
               <AgentComposer

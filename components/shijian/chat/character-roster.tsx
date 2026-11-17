@@ -1,0 +1,132 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { RiSearchLine, RiCloseLine } from '@remixicon/react';
+import { cx } from '@/utils/cx';
+import { AgentAvatar, avatarForCharacter, AvatarKeyframes } from './character-avatar';
+
+/** /api/characters 返回的公开字段（不含 anchors / neverCross）。 */
+export interface PublicCharacter {
+  id: string;
+  source: string;
+  name: string;
+  era: string;
+  lifespan: string;
+  role: string;
+  intro: string;
+  greeting: string;
+  quickQuestions: string[];
+}
+
+export interface CharacterRosterProps {
+  selectedId: string | null;
+  onSelect: (figure: PublicCharacter) => void;
+  busy: boolean;
+  className?: string;
+}
+
+export function CharacterRoster({ selectedId, onSelect, busy, className }: CharacterRosterProps) {
+  const [characters, setCharacters] = useState<PublicCharacter[]>([]);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/characters')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data?.characters)) setCharacters(data.characters);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visibleCharacters = q
+    ? characters.filter((c) =>
+        [c.name, c.era, c.role, c.intro].some((t) => t.toLowerCase().includes(q)),
+      )
+    : characters;
+
+  return (
+    <div className={cx("min-h-0 shrink-0", className)}>
+      <aside
+        aria-label="历史人物"
+        className="flex min-h-0 w-[260px] shrink-0 flex-col rounded-3xl border border-border-button-white bg-background-secondary-default p-[7px] shadow-sidebar"
+      >
+        <div className="flex h-9 w-full items-center gap-2 rounded-full ps-3 pe-2">
+          <RiSearchLine className="size-5 shrink-0 text-foreground-icon-tertiary" aria-hidden />
+          <input
+            type="text"
+            placeholder="搜索人物…"
+            aria-label="搜索人物"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setQuery("");
+              }
+            }}
+            className="min-w-0 flex-1 bg-transparent text-body-regular text-text-primary outline-none placeholder:text-text-tertiary"
+          />
+          <button
+            type="button"
+            aria-label="Close search"
+            title="Close search"
+            onClick={() => {
+              setQuery("");
+            }}
+            className="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary outline-none hover:bg-background-tertiary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+          >
+            <RiCloseLine className="size-4" aria-hidden />
+          </button>
+        </div>
+
+        <AvatarKeyframes />
+
+        {failed && <p className="p-3 text-body-regular text-text-tertiary">人物列表加载失败，请刷新重试。</p>}
+
+        {/* Chat list */}
+        <div className="mt-2 flex min-h-0 flex-1 flex-col">
+          <div
+            tabIndex={0}
+            className="flex h-full flex-col gap-2 overflow-y-auto overscroll-contain outline-none [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-focus-ring"
+          >
+                        {visibleCharacters.map((c, i) => {
+              const active = c.id === selectedId;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onSelect(c)}
+                  aria-current={active ? "page" : undefined}
+                  className={cx(
+                    "flex h-[54px] shrink-0 items-center gap-2.5 rounded-xl p-1.5 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+                    active ? "bg-background-tertiary-default" : "hover:bg-background-secondary-hover",
+                  )}
+                >
+                  <AgentAvatar agent={avatarForCharacter(c.id, c.name)} size={40} blinkDelay={`${(i % 5) * 0.7}s`} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-body-medium text-text-primary">{c.name}</span>
+                    <span title={c.intro} className="truncate text-body-regular text-text-tertiary">{c.intro}</span>
+                  </span>
+                </button>
+              );
+            })}
+            {visibleCharacters.length === 0 && !failed && (
+              <p className="px-2 py-3 text-body-regular text-text-tertiary">
+                没有匹配“{query.trim()}”的人物。
+              </p>
+            )}
+
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
