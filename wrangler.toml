@@ -1,0 +1,7 @@
+name = "shijian"
+compatibility_date = "2026-11-16"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "shijian-db"
+database_id = "b55e65cc-01f6-4adf-907a-af90808a95d0"
