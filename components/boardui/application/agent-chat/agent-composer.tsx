@@ -116,7 +116,7 @@ export function AgentComposer({
         <form
           onSubmit={submit}
           className={cx(
-            "flex min-h-[52px] w-full items-end gap-2.5 rounded-full p-2 flex-wrap",
+            "flex min-h-[52px] w-full items-end gap-2.5 rounded-full p-2",
             // ComposerLoader paints its own pill surface and runs the light
             // behind its children, so an opaque form would cover the light
             // entirely. While busy the form steps aside and lets it show.
@@ -153,7 +153,7 @@ export function AgentComposer({
             onKeyDown={onKeyDown}
             placeholder="输入你的观察或问题…"
             autoComplete="off"
-            className="resize-none overflow-y-auto py-2 min-w-[180px] flex-1 bg-transparent text-body-regular text-text-primary caret-text-primary outline-none placeholder:text-text-tertiary"
+            className="resize-none overflow-y-auto py-2 min-w-0 flex-1 bg-transparent text-body-regular text-text-primary caret-text-primary outline-none placeholder:text-text-tertiary"
             style={{ maxHeight: 116 }}
           />
 
@@ -245,7 +245,7 @@ function ModelSettingsMenu({ model, onModelChange, effort, onEffortChange }: { m
           type="button"
           className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-0.5 rounded-xl bg-background-primary-default py-1.5 pe-1 ps-2 outline-none transition-colors duration-150 ease hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
         >
-          <span className="px-0.5 text-body-medium whitespace-nowrap text-text-secondary">{shortModel(model)}</span>
+          <span className="px-0.5 text-body-medium text-text-secondary hidden max-w-[13ch] truncate sm:inline">{shortModel(model)}</span>
           <RiArrowDownSLine
             className={cx(
               "size-[18px] shrink-0 text-foreground-icon-secondary transition-transform duration-200 ease",
