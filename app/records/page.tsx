@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { loadRecords, clearRecords, loadProfile, saveProfile } from '@/lib/store';
+import { loadRecords, clearRecords, loadProfile, saveProfile, loadServerRecords, isLoggedIn } from '@/lib/store';
 import type { Profile, RecordItem } from '@/lib/store';
 import { RecordsShell } from '@/components/shijian/records-shell';
 import { ProfileModal } from '@/components/shijian/chat/profile-modal';
@@ -42,11 +42,33 @@ export default function RecordsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
 
 
   useEffect(() => {
-    setRecords(loadRecords());
-    setProfile(loadProfile());
+    let cancelled = false;
+
+    const load = async () => {
+      if (!cancelled) {
+        setProfile(loadProfile());
+      }
+      const ok = await isLoggedIn();
+      if (cancelled) return;
+      setLoggedIn(ok);
+      if (ok) {
+        const server = await loadServerRecords();
+        if (cancelled) return;
+        setRecords(server !== null ? server : loadRecords());
+      } else {
+        setRecords(loadRecords());
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleProfileSaved = (next: Profile) => {
@@ -70,7 +92,8 @@ export default function RecordsPage() {
         <Button
           variant="danger"
           size="medium"
-          disabled={records.length === 0}
+          disabled={records.length === 0 || loggedIn}
+          title={loggedIn ? "已登录：服务端记录暂不支持清空" : undefined}
           onClick={() => setConfirmOpen(true)}
         >
           清空全部记录
@@ -79,8 +102,11 @@ export default function RecordsPage() {
     >
       <div className="flex w-full flex-col gap-4">
         <p className="px-1 text-body-regular text-text-secondary">
-          记录你的每一次史料探究。数据保存在本浏览器 localStorage，仅本浏览器有效；清除浏览器数据会丢失，换设备不同步。
+          {loggedIn
+            ? '记录你的每一次史料探究。已登录：记录同步保存在服务端，换设备也能看到。'
+            : '记录你的每一次史料探究。数据保存在本浏览器 localStorage，仅本浏览器有效；清除浏览器数据会丢失，换设备不同步。'}
         </p>
+
 
 
         <section className="rounded-2xl border border-border-table bg-background-primary-default pt-2 pb-3">

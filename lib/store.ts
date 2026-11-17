@@ -133,6 +133,7 @@ export function saveRecord(rec: RecordItem): boolean {
     records.push(record)
     const trimmed = records.length > MAX_RECORDS ? records.slice(records.length - MAX_RECORDS) : records
     window.localStorage.setItem(RECORDS_KEY, JSON.stringify(trimmed))
+    void syncRecordToServer(record);
     return true
   } catch {
     return false
@@ -149,6 +150,8 @@ export function updateRecord(id: string, patch: Partial<RecordItem>): boolean {
     const merged = { ...original, ...normalizeRecord({ ...original, ...patch }) }
     records[idx] = merged
     window.localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
+    const updated = records[idx]
+    void syncRecordToServer(updated);
     return true
   } catch {
     return false
@@ -227,5 +230,96 @@ export function saveSidebarCollapsed(collapsed: boolean): boolean {
     return true
   } catch {
     return false
+  }
+}
+
+export async function isLoggedIn(): Promise<boolean> {
+  try {
+    if (typeof window === 'undefined') return false
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' })
+    if (!res.ok) return false
+    const data: unknown = await res.json()
+    if (!isRecord(data)) return false
+    return isRecord(data.user)
+  } catch {
+    return false
+  }
+}
+
+async function postConversation(rec: RecordItem): Promise<boolean> {
+  try {
+    if (!(await isLoggedIn())) return false
+    const res = await fetch('/api/conversations', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: rec.id,
+        title: rec.topic,
+        task: rec.task,
+        grade: rec.grade,
+        textbook: rec.textbook,
+        messages: rec.messages,
+      }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+export async function syncRecordToServer(rec: RecordItem): Promise<void> {
+  await postConversation(rec)
+}
+
+export async function mergeLocalRecordsToServer(): Promise<void> {
+  try {
+    if (typeof window === 'undefined') return
+    if (window.localStorage.getItem('shijian_records_merged_v1') !== null) return
+    if (!(await isLoggedIn())) return
+    const records = loadRecords()
+    for (const rec of records) {
+      if (!(await postConversation(rec))) return
+    }
+    window.localStorage.setItem('shijian_records_merged_v1', '1')
+  } catch {
+    // 忽略异常，绝不抛出
+  }
+}
+
+export async function loadServerRecords(): Promise<RecordItem[] | null> {
+  try {
+    if (!(await isLoggedIn())) return null
+    const res = await fetch('/api/conversations', { credentials: 'same-origin' })
+    if (!res.ok) return null
+    const data: unknown = await res.json()
+    if (!isRecord(data)) return null
+    const conversations = data.conversations
+    if (!Array.isArray(conversations)) return null
+    const result: RecordItem[] = []
+    for (const item of conversations) {
+      if (!isRecord(item)) continue
+      const rawMessages = Array.isArray(item.messages) ? item.messages : []
+      const firstUser = rawMessages.find(
+        (m): m is { role: 'user'; content: string } =>
+          isRecord(m) && m.role === 'user' && typeof m.content === 'string'
+      )
+      const summary = firstUser ? firstUser.content.slice(0, 80) : ''
+      const createdAt = Number(item.created_at)
+      const mapped = {
+        id: toStr(item.id),
+        date: Number.isFinite(createdAt) ? new Date(createdAt * 1000).toISOString() : '',
+        topic: toStr(item.title),
+        task: toStr(item.task),
+        summary,
+        messages: rawMessages,
+        grade: toStr(item.grade),
+        textbook: toStr(item.textbook),
+      }
+      result.push(normalizeRecord(mapped))
+    }
+    return result
+  } catch {
+    return null
   }
 }
