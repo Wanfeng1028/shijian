@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_META, TaskId } from '@/components/shijian/chat/task-meta'
-import { type PublicCharacter } from '@/components/shijian/chat/character-picker'
+import { type PublicCharacter } from '@/components/shijian/chat/character-roster'
 import { loadProfile, saveProfile, saveRecord, saveTask, loadProfileSkipped, saveProfileSkipped, updateRecord, newRecordId, Profile, RecordItem } from '@/lib/store'
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; at: number }
