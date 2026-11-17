@@ -283,10 +283,10 @@ function ModelSettingsMenu({ model, onModelChange, effort, onEffortChange }: { m
                         isDisabled && "cursor-not-allowed opacity-40",
                       )}
                     >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-body-medium whitespace-nowrap text-text-primary">{shortModel(option.id)}</span>
+                      <span className="flex min-w-0 flex-col items-start">
+                        <span className="break-all text-body-medium text-text-primary">{option.id}</span>
                         {option.reason !== null && (
-                          <span className="truncate text-caption-1-semibold text-text-tertiary">{option.reason}</span>
+                          <span className="text-caption-1-semibold text-text-tertiary">{option.reason}</span>
                         )}
                       </span>
                       <RadioDot selected={option.id === model} />
