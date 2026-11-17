@@ -102,3 +102,4 @@ http://localhost:8000/
 - 不编造史料与出处；无法确认的信息会明确说明。
 - 史料原文、历史事实与 AI 推论会在回答中明确区分。
 - 对争议问题，呈现不同解释及其支撑证据。
+<!-- probe v6: verify auto-merge on a normal PR -->
