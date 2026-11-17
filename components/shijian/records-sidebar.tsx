@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { BookOpenText, Home, MessagesSquare, PanelLeftClose, PanelLeftOpen, UserRound, X } from 'lucide-react';
 import { loadSidebarCollapsed, saveSidebarCollapsed } from '@/lib/store';
 import { Button } from '@/components/boardui/base/buttons/button';
+import { AuthEntry } from '@/components/shijian/auth-entry';
 import { cx } from '@/utils/cx';
 
 export interface RecordsSidebarProps {
@@ -88,6 +89,7 @@ export function RecordsSidebar({
             );
           })}
         </nav>
+        <AuthEntry variant="icon" />
         <button
           type="button"
           aria-label="我的学习档案"
@@ -173,6 +175,7 @@ export function RecordsSidebar({
       </div>
 
       <div className="mt-4 flex shrink-0 flex-col gap-4">
+        <AuthEntry variant="full" />
         <Button variant="secondary" size="medium" onClick={onOpenProfile} className="w-full">
           <UserRound className="size-4" aria-hidden />
           <span>我的学习档案</span>

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { BookOpenText, Home, MessagesSquare, UserRound, X } from 'lucide-react';
 import { Button } from '@/components/boardui/base/buttons/button';
+import { AuthEntry } from '@/components/shijian/auth-entry';
 import { cx } from '@/utils/cx';
 
 export interface HomeDrawerProps {
@@ -103,6 +104,7 @@ export function HomeDrawer({ open, current, onClose, onOpenProfile }: HomeDrawer
           </nav>
 
           <div className="mt-auto flex shrink-0 flex-col gap-4">
+            <AuthEntry variant="full" />
             <Button variant="secondary" size="medium" onClick={onOpenProfile} className="w-full">
               <UserRound className="size-4" aria-hidden />
               我的学习档案

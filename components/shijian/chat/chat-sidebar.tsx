@@ -6,6 +6,7 @@ import { BookOpenText, Home, MessagesSquare, PanelLeftClose, PanelLeftOpen, User
 import { loadSidebarCollapsed, saveSidebarCollapsed } from '@/lib/store';
 import { cx } from '@/utils/cx';
 import { Button } from '@/components/boardui/base/buttons/button';
+import { AuthEntry } from '@/components/shijian/auth-entry';
 import { Select, SelectItem } from '@/components/boardui/base/select/select';
 import {
   CONTEXT_EMPTY_OPTION,
@@ -111,6 +112,7 @@ export function ChatSidebar({
             );
           })}
         </nav>
+        <AuthEntry variant="icon" />
         <button
           type="button"
           aria-label="我的学习档案"
@@ -231,6 +233,7 @@ export function ChatSidebar({
       </div>
 
       <div className="mt-4 flex shrink-0 flex-col gap-4">
+        <AuthEntry variant="full" />
         <Button variant="secondary" size="medium" onClick={onOpenProfile} className="w-full">
           <UserRound className="size-4" />
           我的学习档案
