@@ -44,7 +44,7 @@ export function HomeHeader({ current, profile: _profile, onOpenProfile }: HomeHe
                   key={item.key}
                   href={item.href}
                   className={cx(
-                    'rounded-full px-4 py-2 text-body-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring',
+                    'inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-body-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring',
                     isCurrent
                       ? 'bg-accent-50 text-accent-700'
                       : 'text-text-secondary hover:bg-background-tertiary-default hover:text-text-primary'

@@ -6,6 +6,7 @@ import { ArrowRight, FileText, MessageSquare, Search } from 'lucide-react';
 
 import { ButtonLink } from '@/components/boardui/base/buttons/button';
 import { TASK_META, TASK_ORDER, type TaskId } from '@/components/shijian/chat/task-meta';
+import { HeroPreview } from '@/components/shijian/home/hero-preview';
 import { cx } from '@/utils/cx';
 
 
@@ -60,7 +61,7 @@ export function ShijianHero({ onStartTask }: ShijianHeroProps) {
 
         <h1 className="mt-5 text-[32px] leading-[38px] font-medium tracking-[-0.02em] text-text-primary sm:text-[48px] sm:leading-[56px]">
           <span className="block">从史料中发现问题</span>
-          <span className="block" key={word}>
+          <span className="block text-accent-500" key={word}>
             {word}
           </span>
           <span className="sr-only" aria-live="polite">
@@ -124,22 +125,7 @@ export function ShijianHero({ onStartTask }: ShijianHeroProps) {
               );
             })}
           </div>
-          <div className="relative flex h-[480px] flex-col justify-center bg-background-secondary-default px-4 py-6 sm:h-[560px] sm:px-6">            <h3 className="text-title-2-medium text-text-primary">{tab.label}</h3>
-            <p className="mt-2 max-w-2xl text-body-regular text-text-secondary">{tab.desc}</p>
-            <ul className="mt-4 flex flex-col gap-2">
-              {tab.quick.map((question) => (
-                <li key={question}>
-                  <Link
-                    href={`/chat?task=${active}`}
-                    onClick={() => onStartTask(active)}
-                    className="block w-fit rounded-full bg-background-primary-default px-3.5 py-2 text-body-regular text-text-primary shadow-xs outline-none transition-colors hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
-                  >
-                    {question}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <HeroPreview key={active} task={active} onStartTask={onStartTask} />
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-separator-border px-4 py-3">
             <p className="text-body-regular text-text-secondary">
               {tab.label} · 点按开始一次探究
