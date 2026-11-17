@@ -1,3 +1,4 @@
+# probe v5: verify auto-merge trigger
 name: auto-merge
 
 on:
