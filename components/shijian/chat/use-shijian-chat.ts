@@ -193,6 +193,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
 
       let fatal: 'backend_not_configured' | 'rate_limited' | null = null
       let fatalStatus = ''
+      let sseErrorMessage: string | null = null
       let success = false
       let replyText = ''
       let attempt = 0
@@ -230,6 +231,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
               fatalStatus = '请求太频繁，请稍后再试'
               break
             }
+            if (data && typeof data.message === 'string' && data.message) sseErrorMessage = data.message
             throw new Error('bad response')
           }
 
@@ -261,13 +263,16 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
                 if (!line.startsWith('data:')) continue
                 const payload = line.slice(5).trim()
                 if (!payload) continue
-                let obj: { t?: string; done?: boolean; error?: string }
+                let obj: { t?: string; done?: boolean; error?: string; message?: string; code?: string; reason?: string }
                 try {
                   obj = JSON.parse(payload)
                 } catch {
                   continue
                 }
-                if (obj.error) throw new Error(obj.error)
+                if (obj.error) {
+                if (typeof obj.message === 'string' && obj.message) sseErrorMessage = obj.message
+                throw new Error(obj.error)
+                }
                 if (obj.done) {
                   if (timerRef.current) clearTimeout(timerRef.current)
                   replyText = full
@@ -358,8 +363,9 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
         return
       }
 
-      setStatus('服务暂时不可用，请稍后再试')
-      setNotice('服务暂时不可用，请稍后再试')
+      const failureMessage = sseErrorMessage || '网络异常，回复未完成，请检查网络后重试'
+      setStatus(failureMessage)
+      setNotice(failureMessage)
       setRestoredText(text)
       setBusy(false)
     },
@@ -413,13 +419,13 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
         setStatus('准备就绪')
       } else if (data && data.error === 'rate_limited') {
         setStatus('请求太频繁，请稍后再试')
-        setNotice('评价生成失败，请稍后再试')
+        setNotice(typeof data.message === 'string' && data.message ? data.message : '请求太频繁，请稍后再试')
       } else {
-        setNotice('评价生成失败，请稍后再试')
+        setNotice(typeof data.message === 'string' && data.message ? data.message : '评价未生成：上游模型服务异常，请稍后再试')
         setStatus('准备就绪')
       }
     } catch {
-      setNotice('评价生成失败，请稍后再试')
+      setNotice('网络异常或请求超时，评价未生成，请检查网络后重试')
       setStatus('准备就绪')
     } finally {
       setEvaluating(false)
