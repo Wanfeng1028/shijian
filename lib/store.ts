@@ -317,13 +317,11 @@ export async function syncRecordToServer(rec: RecordItem): Promise<void> {
 export async function mergeLocalRecordsToServer(): Promise<void> {
   try {
     if (typeof window === 'undefined') return
-    if (window.localStorage.getItem('shijian_records_merged_v1') !== null) return
     if (!(await isLoggedIn())) return
     const records = loadRecords()
     for (const rec of records) {
       if (!(await postConversation(rec))) return
     }
-    window.localStorage.setItem('shijian_records_merged_v1', '1')
   } catch {
     // 忽略异常，绝不抛出
   }
