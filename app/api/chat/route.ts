@@ -576,6 +576,7 @@ export async function POST(request: Request): Promise<Response> {
 
     system += '\n\n回答涉及课本内容时，必须引用本次提供的【课本相关段落】，并按（册名·课名·页码）格式标注出处；只许引用本次提供的段落，绝不编造史料、人物原话、数据或出处；没有给出的段落就明说课本里没找到，不许硬凑。';
     system += '\n\n回复中出现的年份必须与题干史料或本次提供的段落一致；如不一致，以题干史料和段落为准。';
+    system += '\n\n回答的形式要求：不要只有纯文字，按内容需要配结构化形式。用户要时间轴、发展脉络、经过（如“时间轴”“按时间顺序”）时，用 ```timeline 代码块输出时间轴，每行一个事件，格式“年份 | 事件”，2-8 条，事件内容来自本次提供的课本段落，仍按（册名·课名·页码）标注出处；时间轴必须包在 ```timeline 代码块里，不许写成 1840年 | …… 这样的裸纯文本行，没有围栏标记就不算时间轴；用户要对比、比较、异同时，用 Markdown 表格输出对比表，第一列是对比项；用户要比较数字大小（如赔款、数量）时，用 ```chart 代码块输出条形图，第一行是标题，之后每行“名称 | 数字”，只写数字，同样必须包在围栏里；不需要结构化形式的问题保持现有回答方式，不要硬加时间轴或表格。';
     system += '\n\n本次回复请控制在约 ' + effortWords + ' 字左右。';
     const messages = appendDocText(retrievalMessages, body.docText);
     const imageData = typeof body.imageData === 'string' && body.imageData.length > 0 ? body.imageData : '';
