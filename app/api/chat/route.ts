@@ -18,17 +18,19 @@ export const runtime = 'edge';
 const RATE = new Map<string, number[]>();
 
 const PRIMARY = 'spark-x2.6';
-const FALLBACK = 'qiniu/conatus-free';
+const FALLBACK = 'glm-5.3-flash';
 
 const KNOWN_MODELS: string[] = [
-  'GLM-5.3',
+  'spark-x2.6',
   'GLM-5.3-Flash',
-  'glm-5.3',
   'glm-5.3-flash',
-  'moonshotai/kimi-k3',
-  'moonshotai/kimi-k3-free',
-  'qiniu/conatus-free',
-  'spark-x2.6'
+  'deepseek-v4.1-flash-1017',
+  'qwen3.8-27b',
+  'intern-s2',
+  'Agents-A1',
+  'Atria-Dawn',
+  'Sage-A1.5',
+  'claude-sonnet-4-6'
 ];
 
 const CHAT_MAX_TOKENS = [600, 1200, 1600, 2000, 2400, 2800];
@@ -143,7 +145,7 @@ async function fetchModelIds(apiKey: string): Promise<string[]> {
     const ids: string[] = [];
     for (const entry of body.data) {
       const id = (entry as any)?.id;
-      if (typeof id === 'string') {
+      if (typeof id === 'string' && KNOWN_MODELS.includes(id)) {
         ids.push(id);
       }
     }
