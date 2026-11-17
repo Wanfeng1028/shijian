@@ -6,3 +6,4 @@ node_modules/
 *.local
 .vercel/
 tsconfig.tsbuildinfo
+data/textbooks/*.pdf
