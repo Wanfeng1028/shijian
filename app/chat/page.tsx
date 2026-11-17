@@ -403,11 +403,11 @@ function ChatPageInner() {
             <div className="mx-auto w-full max-w-3xl">
               {notice ? (
                 <div className="mb-2 flex items-center justify-between rounded-xl border border-accent-300 bg-accent-50 px-3 py-2">
-                  <p className="text-body-2-regular text-accent-900">{notice}</p>
+                  <p className="min-w-0 text-body-2-regular text-accent-900">{notice}</p>
                   <button
                     type="button"
                     onClick={clearNotice}
-                    className="text-caption-1-semibold text-text-tertiary outline-none hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+                    className="shrink-0 whitespace-nowrap text-caption-1-semibold text-text-tertiary outline-none hover:text-text-secondary focus-visible:ring-2 focus-visible:ring-border-focus-ring"
                   >
                     关闭
                   </button>
