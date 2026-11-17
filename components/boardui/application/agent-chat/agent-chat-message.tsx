@@ -9,6 +9,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { cx } from "@/utils/cx";
+import { ChartBlock, TimelineBlock, parseRichBlock } from "@/components/shijian/rich-blocks";
 
 /**
  * One turn in the transcript.
@@ -242,11 +243,18 @@ const MARKDOWN_COMPONENTS: Components = {
 
 // memo + 稳定 key 保证已定稿块不重播动画；原始 HTML 按文本处理，不加 rehype-raw，不使用 dangerouslySetInnerHTML。
 const MarkdownBlock = memo(function MarkdownBlock({ text, animate }: { text: string; animate: boolean }) {
+  const rich = parseRichBlock(text);
   return (
     <motion.div initial={animate ? LINE_HIDDEN : false} animate={LINE_SHOWN} transition={LINE_TRANSITION}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
-        {text}
-      </ReactMarkdown>
+      {rich?.kind === "timeline" ? (
+        <TimelineBlock events={rich.events} />
+      ) : rich?.kind === "chart" ? (
+        <ChartBlock title={rich.title} bars={rich.bars} />
+      ) : (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+          {text}
+        </ReactMarkdown>
+      )}
     </motion.div>
   );
 });
