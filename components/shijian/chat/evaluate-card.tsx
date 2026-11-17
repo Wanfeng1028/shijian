@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/boardui/base/buttons/button';
 import type { EvalScores } from '@/components/shijian/chat/use-shijian-chat';
+import { RiCloseLine } from '@remixicon/react';
 import { cx } from '@/utils/cx';
 
 export interface EvaluateCardProps {
@@ -10,6 +11,7 @@ export interface EvaluateCardProps {
   evaluating: boolean;
   onEvaluate: () => void;
   disabled?: boolean;
+  onClose?: () => void;
 }
 
 const DIMENSIONS: ReadonlyArray<{ label: string; key: keyof EvalScores }> = [
@@ -26,7 +28,7 @@ function formatScore(value: number | undefined | null): string {
   return String(value);
 }
 
-export function EvaluateCard({ scores, advice, evaluating, onEvaluate, disabled }: EvaluateCardProps) {
+export function EvaluateCard({ scores, advice, evaluating, onEvaluate, onClose, disabled }: EvaluateCardProps) {
   return (
     <section
       className={cx(
@@ -37,14 +39,28 @@ export function EvaluateCard({ scores, advice, evaluating, onEvaluate, disabled 
     >
       <div className={cx('flex items-center justify-between gap-3')}>
         <h3 className={cx('text-title-3-semibold text-text-primary')}>学习反馈评价</h3>
-        <Button
-          variant="primary"
-          size="small"
-          onClick={onEvaluate}
-          disabled={evaluating || disabled}
-        >
-          {evaluating ? '正在生成评价…' : '生成评价'}
-        </Button>
+        <div className={cx('flex items-center gap-1')}>
+          {onClose ? (
+            <button
+              type="button"
+              aria-label="关闭评价卡"
+              onClick={onClose}
+              className={cx(
+                'flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary transition-colors hover:bg-background-secondary-hover'
+              )}
+            >
+              <RiCloseLine className={cx('size-4')} />
+            </button>
+          ) : null}
+          <Button
+            variant="primary"
+            size="small"
+            onClick={onEvaluate}
+            disabled={evaluating || disabled}
+          >
+            {evaluating ? '正在生成评价…' : '生成评价'}
+          </Button>
+        </div>
       </div>
       <p className={cx('text-body-regular text-text-secondary')}>
         完成一次探究后，点“生成评价”让史鉴按四个维度打分（1-5 分）。

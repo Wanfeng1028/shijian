@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from "motion/react";
 import { useSearchParams } from 'next/navigation';
 import { RiCloseLine, RiMenuLine } from '@remixicon/react';
 import { FileText } from 'lucide-react';
@@ -63,6 +64,11 @@ function ChatPageInner() {
     setGrade,
     textbook,
     setTextbook,
+    model,
+    setModel,
+    effort,
+    setEffort,
+    lastReplyAt,
     profile,
     profileOpen,
     setProfileOpen,
@@ -85,6 +91,8 @@ function ChatPageInner() {
   } = chat;
 
   const [inputValue, setInputValue] = useState('');
+  const [evalVisible, setEvalVisible] = useState(false);
+  const evalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
@@ -166,7 +174,34 @@ function ChatPageInner() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [navOpen]);
 
+  const hideEval = useCallback(() => {
+    if (evalTimerRef.current) {
+      clearTimeout(evalTimerRef.current);
+      evalTimerRef.current = null;
+    }
+    setEvalVisible(false);
+  }, []);
+
+  const showEvalTimed = useCallback(() => {
+    if (evalTimerRef.current) clearTimeout(evalTimerRef.current);
+    setEvalVisible(true);
+    evalTimerRef.current = setTimeout(() => setEvalVisible(false), 10000);
+  }, []);
+
+  useEffect(() => () => {
+    if (evalTimerRef.current) clearTimeout(evalTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (lastReplyAt !== null) showEvalTimed();
+  }, [lastReplyAt, showEvalTimed]);
+
+  useEffect(() => {
+    if (scores !== null) showEvalTimed();
+  }, [scores, showEvalTimed]);
+
   const handleSubmit = () => {
+    hideEval();
     const value = inputValue;
     setInputValue('');
     void send(value);
@@ -305,7 +340,7 @@ function ChatPageInner() {
                       <button
                         key={suggestion}
                         type="button"
-                        onClick={() => void send(suggestion)}
+                        onClick={() => { hideEval(); void send(suggestion); }}
                         className="cursor-pointer rounded-full bg-background-primary-default px-3.5 py-2 text-body-regular text-text-secondary shadow-xs transition-colors hover:bg-background-primary-hover"
                       >
                         {suggestion}
@@ -319,22 +354,33 @@ function ChatPageInner() {
                 ))
               )}
 
-              {messages.length > 0 ? (
+              {messages.length > 0 && evalVisible ? (
                 <EvaluateCard
                   scores={scores}
                   advice={advice}
                   evaluating={evaluating}
                   onEvaluate={evaluate}
+                  onClose={hideEval}
                   disabled={busy || messages.length < 2}
                 />
               ) : null}
 
               {busy && streamingText === null ? (
-                <AgentThinking variant="wave" label="史鉴正在思考…" className="px-1" />
-              ) : null}
-              {streamingText !== null ? (
-                <AgentMessage role="assistant" text={streamingText} streaming />
-              ) : null}
+      <motion.div initial={{ opacity: 0, y: 6, filter: "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }} className="rounded-3xl border border-border-button-default bg-background-primary-default p-5">
+        <AgentThinking variant="wave" label="史鉴正在思考…" showTimer />
+        <div className="mt-4 flex flex-col gap-2">
+          <div className="h-3 w-11/12 animate-pulse rounded-full bg-background-secondary-default" />
+          <div className="h-3 w-8/12 animate-pulse rounded-full bg-background-secondary-default" />
+          <div className="h-3 w-9/12 animate-pulse rounded-full bg-background-secondary-default" />
+        </div>
+        <p className="mt-3 text-caption-1-semibold text-text-tertiary">正在组织史料与教材依据…</p>
+      </motion.div>
+    ) : null}
+    {streamingText !== null ? (
+      <motion.div key="streaming" initial={{ opacity: 0, y: 6, filter: "blur(6px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)" }} transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}>
+        <AgentMessage role="assistant" text={streamingText} streaming />
+      </motion.div>
+    ) : null}
             </div>
           </div>
 
@@ -371,12 +417,15 @@ function ChatPageInner() {
 
               <AgentComposer
                 value={inputValue}
-                onValueChange={setInputValue}
+                onValueChange={(v: string) => { setInputValue(v); if (v.trim().length > 0) hideEval(); }}
                 onSubmit={handleSubmit}
                 onStop={stop}
                 onAddAttachment={openAttachPicker}
                 busy={busy}
-                model="spark-x2.6"
+                model={model}
+                onModelChange={setModel}
+                effort={effort}
+                onEffortChange={setEffort}
                 provider="BotsRouter"
                 messageCount={messages.length}
               />

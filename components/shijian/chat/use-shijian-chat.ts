@@ -8,6 +8,11 @@ export interface UseShijianChatResult {
   messages: ChatMessage[];
   status: string;
   busy: boolean;
+  model: string;
+  setModel: (model: string) => void;
+  effort: number;
+  setEffort: (effort: number) => void;
+  lastReplyAt: number | null;
   streamingText: string | null;
   pendingImage: string | null;
   pendingDocText: string;
@@ -57,6 +62,9 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const [status, setStatus] = useState('准备就绪')
   const [busy, setBusy] = useState(false)
   const [streamingText, setStreamingText] = useState<string | null>(null)
+  const [model, setModel] = useState('spark-x2.6')
+  const [effort, setEffort] = useState(1)
+  const [lastReplyAt, setLastReplyAt] = useState<number | null>(null)
   const [pendingImage, setPendingImage] = useState<string | null>(null)
   const [pendingDocText, setPendingDocText] = useState('')
   const [pendingDocName, setPendingDocName] = useState('')
@@ -126,12 +134,16 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
 
   const buildBody = useCallback(
     (text: string, lastMessages: ChatMessage[], action: 'chat' | 'evaluate') => {
+      const EFFORT_LABELS = ['Low', 'Medium', 'Balanced', 'High', 'Very High', 'Max']
       const body: Record<string, unknown> = {
         action,
         task: currentTask,
         grade,
         textbook,
         topic,
+        model,
+        effort,
+        effortLabel: EFFORT_LABELS[effort] || 'Medium',
         messages: lastMessages.slice(-10),
       }
       if (action === 'chat') {
@@ -141,7 +153,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
       }
       return body
     },
-    [currentTask, grade, textbook, topic, pendingImage, pendingDocText]
+    [currentTask, grade, textbook, topic, model, effort, pendingImage, pendingDocText]
   )
 
   const send = useCallback(
@@ -292,6 +304,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
             summary: replyText.slice(0, 60),
           })
         }
+        setLastReplyAt(Date.now())
         setPendingImage(null)
         setPendingDocText('')
         setPendingDocName('')
@@ -445,5 +458,10 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     removeImage,
     handleDocFile,
     removeDoc,
+    model,
+    setModel,
+    effort,
+    setEffort,
+    lastReplyAt,
   }
 }
