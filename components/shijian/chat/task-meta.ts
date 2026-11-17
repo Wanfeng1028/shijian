@@ -1,4 +1,4 @@
-export type TaskId = 'reading' | 'analysis' | 'explanation'
+export type TaskId = 'reading' | 'analysis' | 'explanation' | 'roleplay'
 
 export const TASK_META = {
   reading: {
@@ -19,9 +19,15 @@ export const TASK_META = {
     welcome: '你好，我是史鉴。先告诉我你想解释的历史问题，我们按“明确问题—梳理背景—提取证据—分析逻辑—形成解释—迁移训练”一步步来。',
     quick: ['为什么会发生鸦片战争？', '新航路开辟带来了哪些变化？', '如何评价洋务运动？'],
   },
+  roleplay: {
+    label: '历史人物对话',
+    desc: '选一位历史人物，以第一人称与他对话；内容为按当时局限的推想，非史料原文。',
+    welcome: '你好，我是史鉴。先选一位历史人物，再开始沉浸对话。',
+    quick: ['你能扮演商鞅和我对话吗？', '历史人物对话是怎么回事？', '我想和秦始皇聊聊郡县制'],
+  },
 } satisfies Record<TaskId, { label: string; desc: string; welcome: string; quick: string[] }>
 
-export const TASK_ORDER: TaskId[] = ['reading', 'analysis', 'explanation']
+export const TASK_ORDER: TaskId[] = ['reading', 'analysis', 'explanation', 'roleplay']
 
 export const GRADE_OPTIONS = ['高一', '高二', '高三'] as const
 export const CONTEXT_EMPTY_OPTION = '未设置'

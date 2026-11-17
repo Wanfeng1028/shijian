@@ -33,6 +33,16 @@ const PREVIEW_CONTENT: Record<TaskId, { turns: { role: 'user' | 'assistant'; tex
     tagLabel: '六步结构',
     tags: ['明确问题', '梳理背景', '提取证据', '分析逻辑', '形成解释', '迁移训练'],
   },
+  roleplay: {
+    turns: [
+      { role: 'user', text: '商鞅，变法为什么从重农抑商开始？' },
+      { role: 'assistant', text: '我是商鞅，以下是我按当时所知所想的推想，不是史料原文。秦国地广而贫，百姓无功不得进；重农抑商、奖励耕织，是让百姓先有饭吃、国先有粮。以上为按当时局限的推想，非史料原文。' },
+      { role: 'user', text: '那废井田、开阡陌呢？' },
+      { role: 'assistant', text: '井田一废，贵族的世禄根基就动了，所以他们反对。但法若不行，秦无出路。以上为按当时局限的推想，非史料原文。' },
+    ],
+    tagLabel: '沉浸对话',
+    tags: ['第一人称', '标明推想', '不编造'],
+  },
 };
 
 export function HeroPreview({ task, onStartTask }: { task: TaskId; onStartTask: (task: TaskId) => void }) {

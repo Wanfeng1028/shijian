@@ -132,10 +132,10 @@ export function formatChunk(chunk: Chunk): string {
 
 export async function retrieveContext(
   query: string,
-  opts: { task?: string; grade?: string; textbook?: string }
+  opts: { task?: string; grade?: string; textbook?: string; topK?: number }
 ): Promise<{
   context: string;
-  sources: Array<{ book: string; unit: string; lesson: string; page: string }>;
+  sources: Array<{ id: string; book: string; unit: string; lesson: string; page: string }>;
 }> {
   if (query.trim() === "") {
     return { context: "", sources: [] };
@@ -159,14 +159,15 @@ export async function retrieveContext(
   } else {
     results = searchScores(terms, null);
   }
-  const hits = results.filter((r) => r.score >= MIN_SCORE).slice(0, TOP_K);
+  const topK = typeof opts.topK === 'number' && opts.topK > 0 ? Math.floor(opts.topK) : TOP_K;
+  const hits = results.filter((r) => r.score >= MIN_SCORE).slice(0, topK);
   if (hits.length === 0) {
     return { context: "", sources: [] };
   }
   const context = hits.map((r) => formatChunk(chunks[r.doc])).join("\n\n");
   const sources = hits.map((r) => {
     const c = chunks[r.doc];
-    return { book: c.book, unit: c.unit, lesson: c.lesson, page: String(c.page) };
+    return { id: c.id, book: c.book, unit: c.unit, lesson: c.lesson, page: String(c.page) };
   });
   return { context, sources };
 }
