@@ -1,3 +1,4 @@
+# probe: verify auto-merge workflow
 name: auto-merge
 
 on:
