@@ -218,7 +218,7 @@ const MODEL_OPTIONS: ReadonlyArray<{ id: string; reason: string | null }> = [
 ];
 
 const MENU_POPOVER_CLASS = cx(
-  "w-[266px] max-w-[calc(100vw-32px)] origin-bottom-left",
+  "flex flex-col overflow-hidden w-[266px] max-w-[calc(100vw-32px)] origin-bottom-left",
   "rounded-2xl border border-border-button-default bg-background-primary-default p-2.5 shadow-dropdown",
   "transition duration-150 ease-out",
   "data-[entering]:opacity-0 data-[entering]:scale-95 data-[entering]:blur-[2px]",
@@ -256,9 +256,9 @@ function ModelSettingsMenu({ model, onModelChange, effort, onEffortChange }: { m
         </button>
       </Pressable>
       <AriaPopover ref={popoverRef} isNonModal placement="top start" offset={8} className={MENU_POPOVER_CLASS}>
-        <AriaDialog aria-label="Model settings" className="flex flex-col outline-none">
-          <div className="flex flex-col">
-            <div className="flex w-full flex-col gap-1.5 pt-1">
+        <AriaDialog aria-label="Model settings" className="flex flex-col outline-none min-h-0 flex-1 overflow-hidden">
+          <div className="flex flex-col min-h-0 flex-1">
+            <div className="flex w-full flex-col gap-1.5 pt-1 min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <span className="ps-2 text-body-medium text-text-secondary">Models</span>
               <div className="flex w-full flex-col gap-1" role="radiogroup" aria-label="Model">
                 {MODEL_OPTIONS.map((option) => {
@@ -295,8 +295,8 @@ function ModelSettingsMenu({ model, onModelChange, effort, onEffortChange }: { m
                 })}
               </div>
             </div>
-            <div className="-mx-2.5 mt-[7px] mb-3 h-px bg-border-button-default" />
-            <div className="flex w-full flex-col">
+            <div className="-mx-2.5 mt-[7px] mb-3 h-px bg-border-button-default shrink-0" />
+            <div className="flex w-full flex-col shrink-0">
               <span className="ps-2 text-body-medium text-text-secondary">
                 Effort{" "}
                 <motion.span
