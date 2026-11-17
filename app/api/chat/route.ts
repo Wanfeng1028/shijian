@@ -252,6 +252,8 @@ export async function POST(request: Request): Promise<Response> {
       const retrievedContext = typeof retrieved?.context === 'string' ? retrieved.context : '';
       if (retrievedContext) {
         system += '\n\n【课本相关段落（供参考，以原文为准）】\n' + retrievedContext;
+      } else {
+        system += '\n\n本次未检索到相关课本段落：涉及课本原文、页码、课名时只按已给材料回答，不知道就明说不知道，不得编造出处。';
       }
     } catch (_) {}
 
