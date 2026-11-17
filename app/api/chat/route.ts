@@ -30,7 +30,7 @@ const KNOWN_MODELS: string[] = [
 
 const CHAT_MAX_TOKENS = [600, 1200, 1600, 2000, 2400, 2800];
 const EVAL_MAX_TOKENS = [500, 800, 1000, 1200, 1400, 1600];
-const REASONING_EFFORTS = ['low', 'medium', 'medium', 'high', 'high', 'high'];
+const REASONING_EFFORTS = ['low', 'medium', 'medium', 'high', 'high', 'medium'];
 const EFFORT_WORDS = [300, 600, 800, 1000, 1200, 1400];
 
 interface UpstreamFailure {
