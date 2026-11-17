@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_META, TaskId } from '@/components/shijian/chat/task-meta'
-import { loadProfile, saveProfile, saveRecord, saveTask, Profile } from '@/lib/store'
+import { loadProfile, saveProfile, saveRecord, saveTask, loadProfileSkipped, saveProfileSkipped, updateRecord, newRecordId, Profile, RecordItem } from '@/lib/store'
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; at: number }
 export interface EvalScores { extraction: number; analysis: number; connection: number; explanation: number }
@@ -29,6 +29,7 @@ export interface UseShijianChatResult {
   profileOpen: boolean;
   setProfileOpen: (open: boolean) => void;
   saveProfileAndSync: (profile: Profile) => void;
+  restoreSession: (record: RecordItem) => void;
   send: (text: string) => Promise<void>;
   stop: () => void;
   /** Clears the open chat back to the template empty state. */
@@ -80,6 +81,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const [notice, setNotice] = useState<string | null>(null)
   const [restoredText, setRestoredText] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const activeRecordIdRef = useRef<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stoppedRef = useRef(false)
 
@@ -91,7 +93,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
       setProfile(p)
       setGrade(p.grade || '')
       setTextbook(p.textbook || '')
-    } else {
+    } else if (!loadProfileSkipped()) {
       setProfileOpen(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -101,11 +103,30 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const clearRestoredText = useCallback(() => setRestoredText(null), [])
 
   const saveProfileAndSync = useCallback((p: Profile) => {
+    saveProfileSkipped(false)
     saveProfile(p)
     setProfile(p)
     setGrade(p.grade || '')
     setTextbook(p.textbook || '')
     setProfileOpen(false)
+  }, [])
+
+  const restoreSession = useCallback((record: RecordItem) => {
+    if (!record.messages || record.messages.length === 0) return
+    setMessages(record.messages.map((m) => ({ role: m.role, content: m.content, at: m.at })))
+    setTopic(record.topic || '')
+    const meta = (TASK_META as Record<string, { welcome?: string } | undefined>)[record.task]
+    if (meta) {
+      setCurrentTask(record.task as TaskId)
+      saveTask(record.task)
+    }
+    setGrade(record.grade || '')
+    setTextbook(record.textbook || '')
+    setScores(null)
+    setAdvice(null)
+    setNotice(null)
+    setStatus('准备就绪')
+    activeRecordIdRef.current = record.id || null
   }, [])
 
   const switchTask = useCallback((task: TaskId) => {
@@ -122,6 +143,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     setAdvice(null)
     setNotice(null)
     setStatus('准备就绪')
+    activeRecordIdRef.current = null
   }, [])
 
   const resetTimer = useCallback((controller: AbortController, onStall: () => void) => {
@@ -297,12 +319,28 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
 
       if (success) {
         if (replyText) {
-          saveRecord({
-            date: new Date().toISOString(),
-            topic: topic || text.slice(0, 20),
-            task: currentTask,
-            summary: replyText.slice(0, 60),
-          })
+          const doneMessages: ChatMessage[] = [...baseMessages, { role: 'assistant', content: replyText, at: Date.now() }]
+          const activeId = activeRecordIdRef.current
+          if (activeId) {
+            updateRecord(activeId, {
+              messages: doneMessages,
+              summary: replyText.slice(0, 60),
+              date: new Date().toISOString(),
+            })
+          } else {
+            const id = newRecordId()
+            saveRecord({
+              id,
+              date: new Date().toISOString(),
+              topic: topic || text.slice(0, 20),
+              task: currentTask,
+              summary: replyText.slice(0, 60),
+              messages: doneMessages,
+              grade,
+              textbook,
+            })
+            activeRecordIdRef.current = id
+          }
         }
         setLastReplyAt(Date.now())
         setPendingImage(null)
@@ -443,6 +481,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     profileOpen,
     setProfileOpen,
     saveProfileAndSync,
+    restoreSession,
     send,
     stop,
     resetChat,

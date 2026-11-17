@@ -5,17 +5,29 @@ export interface Profile {
   progress: string
 }
 
+export interface StoredMessage {
+  role: 'user' | 'assistant'
+  content: string
+  at: number
+}
+
 export interface RecordItem {
+  id: string
   date: string
   topic: string
   task: string
   summary: string
+  messages: StoredMessage[]
+  grade: string
+  textbook: string
 }
 
 const PROFILE_KEY = 'shijian_profile'
 const RECORDS_KEY = 'shijian_records'
 export const TASK_KEY = 'shijian_task'
 const MAX_RECORDS = 200
+const PROFILE_SKIPPED_KEY = 'shijian_profile_skipped'
+const SIDEBAR_KEY = 'shijian_sidebar_collapsed'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -35,13 +47,29 @@ function normalizeProfile(value: unknown): Profile {
   }
 }
 
+function normalizeStoredMessage(value: unknown): StoredMessage | null {
+  if (!isRecord(value)) return null
+  const role = value.role
+  if (role !== 'user' && role !== 'assistant') return null
+  const content = typeof value.content === 'string' ? value.content : String(value.content ?? '')
+  const atNum = Number(value.at)
+  const at = Number.isFinite(atNum) ? atNum : 0
+  return { role, content, at }
+}
+
 function normalizeRecord(value: unknown): RecordItem {
-  if (!isRecord(value)) return { date: '', topic: '', task: '', summary: '' }
+  if (!isRecord(value)) return { id: '', date: '', topic: '', task: '', summary: '', messages: [], grade: '', textbook: '' }
+  const rawMessages = Array.isArray(value.messages) ? value.messages : []
+  const messages = rawMessages.map(normalizeStoredMessage).filter((m): m is StoredMessage => m !== null)
   return {
+    id: toStr(value.id),
     date: toStr(value.date),
     topic: toStr(value.topic),
     task: toStr(value.task),
     summary: toStr(value.summary),
+    messages,
+    grade: toStr(value.grade),
+    textbook: toStr(value.textbook),
   }
 }
 
@@ -89,13 +117,38 @@ export function loadRecords(): RecordItem[] {
   }
 }
 
+export function newRecordId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `rec-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 export function saveRecord(rec: RecordItem): boolean {
   try {
     if (typeof window === 'undefined') return false
+    const normalized = normalizeRecord(rec)
+    const record = normalized.id === '' ? { ...normalized, id: newRecordId() } : normalized
     const records = loadRecords()
-    records.push(normalizeRecord(rec))
+    records.push(record)
     const trimmed = records.length > MAX_RECORDS ? records.slice(records.length - MAX_RECORDS) : records
     window.localStorage.setItem(RECORDS_KEY, JSON.stringify(trimmed))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function updateRecord(id: string, patch: Partial<RecordItem>): boolean {
+  try {
+    if (typeof window === 'undefined') return false
+    const records = loadRecords()
+    const idx = records.findIndex((r) => r.id === id)
+    if (idx === -1) return false
+    const original = records[idx]
+    const merged = { ...original, ...normalizeRecord({ ...original, ...patch }) }
+    records[idx] = merged
+    window.localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
     return true
   } catch {
     return false
@@ -125,6 +178,52 @@ export function saveTask(task: string): boolean {
   try {
     if (typeof window === 'undefined') return false
     window.sessionStorage.setItem(TASK_KEY, task)
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadProfileSkipped(): boolean {
+  try {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem(PROFILE_SKIPPED_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveProfileSkipped(skipped: boolean): boolean {
+  try {
+    if (typeof window === 'undefined') return false
+    if (skipped) {
+      window.localStorage.setItem(PROFILE_SKIPPED_KEY, '1')
+    } else {
+      window.localStorage.removeItem(PROFILE_SKIPPED_KEY)
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadSidebarCollapsed(): boolean {
+  try {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem(SIDEBAR_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function saveSidebarCollapsed(collapsed: boolean): boolean {
+  try {
+    if (typeof window === 'undefined') return false
+    if (collapsed) {
+      window.localStorage.setItem(SIDEBAR_KEY, '1')
+    } else {
+      window.localStorage.removeItem(SIDEBAR_KEY)
+    }
     return true
   } catch {
     return false

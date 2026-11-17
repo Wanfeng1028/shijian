@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { loadRecords, clearRecords, loadProfile, saveProfile } from '@/lib/store';
 import type { Profile, RecordItem } from '@/lib/store';
@@ -30,7 +31,12 @@ function formatDate(date: string): string {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+function canResume(r: RecordItem): boolean {
+  return Boolean(r.id) && Array.isArray(r.messages) && r.messages.length > 0;
+}
+
 export default function RecordsPage() {
+  const router = useRouter();
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [filter, setFilter] = useState<string>('all');
@@ -131,12 +137,20 @@ export default function RecordsPage() {
                   <div className="flex-1 min-w-0 px-3">主题</div>
                   <div className="w-[110px] shrink-0">任务类型</div>
                   <div className="flex-[2] min-w-0 pl-3">摘要</div>
+                  <div className="w-[64px] shrink-0 pl-3">操作</div>
                 </div>
                 {visible.map((r, i) => (
                   <div
-                    key={`${r.date}-${r.topic}-${i}`}
+                    key={r.id || `${r.date}-${r.topic}-${i}`}
+                    role={canResume(r) ? 'button' : undefined}
+                    tabIndex={canResume(r) ? 0 : undefined}
+                    aria-label={canResume(r) ? `继续对话：${r.topic}` : undefined}
+                    title={canResume(r) ? '点击回到对话页继续聊' : '该记录没有完整对话内容，仅可查看'}
+                    onClick={canResume(r) ? () => router.push(`/chat?session=${encodeURIComponent(r.id)}`) : undefined}
+                    onKeyDown={canResume(r) ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/chat?session=${encodeURIComponent(r.id)}`); } } : undefined}
                     className={cx(
-                      'flex items-center border-b border-separator-border px-3 py-2.5 hover:bg-background-secondary-hover',
+                      'flex items-center border-b border-separator-border px-3 py-2.5',
+                      canResume(r) && 'cursor-pointer hover:bg-background-secondary-hover',
                       i === visible.length - 1 && 'border-b-0',
                     )}
                   >
@@ -151,6 +165,9 @@ export default function RecordsPage() {
                     </div>
                     <div className="flex-[2] min-w-0 line-clamp-2 pl-3 text-body-medium text-text-secondary">
                       {r.summary}
+                    </div>
+                    <div className="w-[64px] shrink-0 whitespace-nowrap pl-3 text-body-medium text-accent-600">
+                      {canResume(r) ? '续聊 →' : '仅查看'}
                     </div>
                   </div>
                 ))}

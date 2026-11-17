@@ -27,9 +27,13 @@ export interface HistoryRailProps {
  * 史鉴对话页右侧记录栏。几何与结构取 BoardUI AgentChatHistory
  *（260px 独立卡片、rounded-3xl、bg-background-secondary-default、p-3、
  * gap-6；New chat / Recent / 底部导出）；内容换成史鉴学习记录。
- * 记录只有主题与摘要、没有全文消息，行点按进 /records 页查看，
- * 不伪造可恢复的会话。
+ * 带完整消息的记录点按进 /chat?session=<id> 恢复会话续聊；
+ * 老记录没有完整消息，只链到 /records 页查看，不伪造可恢复的会话。
  */
+function canResume(record: RecordItem): boolean {
+  return Boolean(record.id) && Array.isArray(record.messages) && record.messages.length > 0;
+}
+
 export function HistoryRail({
   refreshKey,
   onNewChat,
@@ -74,9 +78,9 @@ export function HistoryRail({
         ) : (
           visible.map((record, i) => (
             <Link
-              key={`${record.date}-${record.topic}-${i}`}
-              href="/records"
-              title={`${TASK_LABELS[record.task] ?? record.task}：${record.summary}`}
+              key={record.id || `${record.date}-${record.topic}-${i}`}
+              href={canResume(record) ? `/chat?session=${encodeURIComponent(record.id)}` : '/records'}
+              title={canResume(record) ? `继续对话：${record.summary}` : `${TASK_LABELS[record.task] ?? record.task}：${record.summary}`}
               className="group/row relative flex items-center rounded-2lg outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
             >
               <span className="flex min-w-0 flex-1 items-center gap-1.5 py-1.5 ps-2 text-start">

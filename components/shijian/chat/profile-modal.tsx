@@ -11,6 +11,7 @@ import { Select, SelectItem } from '@/components/boardui/base/select/select';
 import { Input } from '@/components/boardui/base/input/input';
 import { Button } from '@/components/boardui/base/buttons/button';
 import type { Profile } from '@/lib/store';
+import { saveProfileSkipped } from '@/lib/store';
 import { GRADE_OPTIONS, PROFILE_EMPTY_OPTION, SEMESTER_OPTIONS, TEXTBOOK_OPTIONS } from '@/components/shijian/chat/task-meta';
 import { cx } from '@/utils/cx';
 
@@ -41,6 +42,11 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
     onClose();
   };
 
+  const handleDismiss = () => {
+    saveProfileSkipped(true);
+    onClose();
+  };
+
   return (
     <Modal
       isOpen={open}
@@ -53,7 +59,7 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
     >
       <ModalHeader
         title="我的学习档案"
-        description="完善档案后，史鉴会尽量按你的学习阶段与教材版本调整提问和解释方式。"
+        description="填了年级和教材，史鉴才能按你的课本和进度出题。"
       />
       <ModalBody>
         <div className={cx('flex flex-col gap-5')}>
@@ -102,13 +108,18 @@ export function ProfileModal({ open, onClose, initial, onSaved }: ProfileModalPr
         </div>
       </ModalBody>
       <ModalFooter>
-        <div className={cx('flex w-full items-center justify-end gap-3')}>
-          <Button variant="secondary" size="medium" onClick={onClose}>
-            取消
+        <div className={cx('flex w-full items-center justify-between gap-3')}>
+          <Button variant="ghost" size="medium" onClick={handleDismiss}>
+            先不填
           </Button>
-          <Button variant="primary" size="medium" onClick={handleSave}>
-            保存
-          </Button>
+          <div className={cx('flex items-center gap-3')}>
+            <Button variant="secondary" size="medium" onClick={handleDismiss}>
+              取消
+            </Button>
+            <Button variant="primary" size="medium" onClick={handleSave}>
+              保存
+            </Button>
+          </div>
         </div>
       </ModalFooter>
     </Modal>

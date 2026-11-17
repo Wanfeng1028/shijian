@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from "motion/react";
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { RiCloseLine, RiMenuLine } from '@remixicon/react';
 import { FileText } from 'lucide-react';
 import { cx } from '@/utils/cx';
@@ -46,7 +46,10 @@ function deriveTitle(messages: Array<{ role: string; content: string }>): string
 
 function ChatPageInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const taskParam = searchParams.get('task');
+  const sessionParam = searchParams.get('session');
+  const restoredRef = useRef(false);
   const [initialTask] = useState<TaskId>(() => resolveInitialTask(taskParam));
   const [navOpen, setNavOpen] = useState(false);
 
@@ -73,6 +76,7 @@ function ChatPageInner() {
     profileOpen,
     setProfileOpen,
     saveProfileAndSync,
+    restoreSession,
     send,
     stop,
     resetChat,
@@ -89,6 +93,17 @@ function ChatPageInner() {
     handleDocFile,
     removeDoc,
   } = chat;
+
+  useEffect(() => {
+    if (restoredRef.current) return;
+    if (!sessionParam) return;
+    restoredRef.current = true;
+    const record = loadRecords().find((r) => r.id === sessionParam);
+    if (record && record.messages && record.messages.length > 0) {
+      restoreSession(record);
+    }
+    router.replace('/chat', { scroll: false });
+  }, [sessionParam, restoreSession, router]);
 
   const [inputValue, setInputValue] = useState('');
   const [evalVisible, setEvalVisible] = useState(false);
