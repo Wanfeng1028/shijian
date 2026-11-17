@@ -6,15 +6,28 @@ import {
   RiArrowDownSLine,
   RiArrowUpLine,
   RiAttachment2,
-  RiCheckLine,
   RiInfinityLine,
   RiSparklingLine,
   RiStopFill,
 } from "@remixicon/react";
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 
+import {
+  Dialog as AriaDialog,
+  DialogTrigger as AriaDialogTrigger,
+  Popover as AriaPopover,
+  Pressable,
+} from "react-aria-components";
+import { motion } from "motion/react";
+
 import { ComposerLoader } from "@/components/boardui/application/composer-loader/composer-loader";
+import { EffortSlider, EFFORT_LEVELS } from "@/components/boardui/application/agent-chat/effort-slider";
+import { RadioDot } from "@/components/boardui/base/radio/radio";
 import { cx } from "@/utils/cx";
+import {
+  useDismissOnOutsidePress,
+  useTriggerToggle,
+} from "@/utils/use-dismiss-on-outside-press";
 
 /**
  * The free composer: a 52px pill with a text field and circular controls,
@@ -79,39 +92,6 @@ export function AgentComposer({
     el.style.height = `${Math.min(el.scrollHeight, 116)}px`;
   }, [value]);
 
-  const MODEL_OPTIONS: ReadonlyArray<{ id: string; reason: string | null }> = [
-    { id: "spark-x2.6", reason: null },
-    { id: "GLM-5.3", reason: "上游故障 500" },
-    { id: "GLM-5.3-Flash", reason: "余额不足 402" },
-    { id: "glm-5.3", reason: "渠道密钥失效 401（向量潮汐）" },
-    { id: "glm-5.3-flash", reason: "余额不足 402" },
-    { id: "moonshotai/kimi-k3", reason: "不存在 404" },
-    { id: "moonshotai/kimi-k3-free", reason: "已退役 502（2026-10-27）" },
-    { id: "qiniu/conatus-free", reason: "全局限流 429" },
-  ];
-
-  const EFFORT_LEVELS: ReadonlyArray<{ label: string; zh: string; desc: string }> = [
-    { label: "Low", zh: "低", desc: "最快、最简短" },
-    { label: "Medium", zh: "中", desc: "默认均衡" },
-    { label: "Balanced", zh: "均衡", desc: "质量与速度平衡" },
-    { label: "High", zh: "高", desc: "更深入" },
-    { label: "Very High", zh: "很高", desc: "更详尽" },
-    { label: "Max", zh: "最强", desc: "最完整、最慢" },
-  ];
-  const [openMenu, setOpenMenu] = useState<"model" | "effort" | null>(null);
-
-  const currentEffort = EFFORT_LEVELS[effort] ?? EFFORT_LEVELS[1];
-
-  useEffect(() => {
-    if (!openMenu) return;
-    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpenMenu(null);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [openMenu]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -127,14 +107,6 @@ export function AgentComposer({
 
   return localize((
     <div className={cx("flex w-full flex-col gap-2.5", className)}>
-      {openMenu !== null ? (
-        <button
-          type="button"
-          aria-label="关闭菜单"
-          onClick={() => setOpenMenu(null)}
-          className="fixed inset-0 z-40 cursor-default bg-transparent"
-        />
-      ) : null}
       {/* radius omitted: ComposerLoader defaults to a full pill, matching the form. */}
       <ComposerLoader active={busy}>
         {/* The pill sits one step lighter than the chat surface behind it in
@@ -186,129 +158,14 @@ export function AgentComposer({
           />
 
           {model ? (
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                aria-haspopup="menu"
-                aria-expanded={openMenu === "model"}
-                onClick={() => setOpenMenu(openMenu === "model" ? null : "model")}
-                className="flex h-8 shrink-0 items-center gap-1 rounded-xl py-1.5 pe-2 ps-2 text-body-2-medium text-text-secondary transition-colors hover:bg-background-secondary-hover"
-              >
-                <RiSparklingLine className="size-4 shrink-0 text-foreground-icon-secondary" aria-hidden />
-                <span className="hidden max-w-[13ch] truncate sm:inline">{shortModel(model)}</span>
-                <RiArrowDownSLine
-                  className={cx(
-                    "size-4 shrink-0 text-foreground-icon-secondary transition-transform",
-                    openMenu === "model" && "rotate-180",
-                  )}
-                  aria-hidden
-                />
-              </button>
-
-              {openMenu === "model" ? (
-                <div
-                  role="menu"
-                  aria-label="选择模型"
-                  className="absolute bottom-full left-0 z-50 mb-2 max-h-80 w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-border-button-default bg-background-primary-default p-1.5 shadow-lg"
-                >
-                  <div className="px-2 py-1.5 text-caption-1-semibold text-text-tertiary">
-                    模型（仅 spark-x2.6 可用）
-                  </div>
-                  {MODEL_OPTIONS.map((option) => (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      key={option.id}
-                      disabled={option.reason !== null}
-                      aria-disabled={option.reason !== null}
-                      onClick={() => {
-                        onModelChange?.(option.id);
-                        setOpenMenu(null);
-                      }}
-                      className={cx(
-                        "flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-start transition-colors hover:bg-background-secondary-hover disabled:hover:bg-transparent",
-                        option.reason !== null && "opacity-40 cursor-not-allowed",
-                      )}
-                    >
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-body-2-medium text-text-primary">
-                          {shortModel(option.id)}
-                        </span>
-                        {option.reason === null ? (
-                          <span className="shrink-0 rounded-full bg-accent-50 px-1.5 text-caption-1-semibold text-accent-900">
-                            可用
-                          </span>
-                        ) : null}
-                        {option.reason !== null ? (
-                          <span className="truncate text-caption-1-semibold text-text-tertiary">
-                            {option.reason}
-                          </span>
-                        ) : null}
-                      </span>
-                      {option.id === model ? (
-                        <RiCheckLine className="size-4 shrink-0 text-foreground-icon-secondary" aria-hidden />
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <ModelSettingsMenu
+              model={model}
+              onModelChange={onModelChange}
+              effort={effort}
+              onEffortChange={onEffortChange}
+            />
           ) : null}
 
-          <div className="relative shrink-0">
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-expanded={openMenu === "effort"}
-              onClick={() => setOpenMenu(openMenu === "effort" ? null : "effort")}
-              className="flex h-8 shrink-0 items-center gap-1 rounded-xl py-1.5 pe-2 ps-2 text-body-2-medium text-text-secondary transition-colors hover:bg-background-secondary-hover"
-            >
-              <span className="truncate">{currentEffort.label} {currentEffort.zh}</span>
-              <RiArrowDownSLine
-                className={cx(
-                  "size-4 shrink-0 text-foreground-icon-secondary transition-transform",
-                  openMenu === "effort" && "rotate-180",
-                )}
-                aria-hidden
-              />
-            </button>
-
-            {openMenu === "effort" ? (
-              <div
-                role="menu"
-                aria-label="选择思考强度"
-                className="absolute bottom-full left-0 z-50 mb-2 w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-border-button-default bg-background-primary-default p-1.5 shadow-lg"
-              >
-                <div className="px-2 py-1.5 text-caption-1-semibold text-text-tertiary">
-                  思考强度
-                </div>
-                {EFFORT_LEVELS.map((level, index) => (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    key={level.label}
-                    onClick={() => {
-                      onEffortChange?.(index);
-                      setOpenMenu(null);
-                    }}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl px-2 py-2 text-start transition-colors hover:bg-background-secondary-hover"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-body-2-medium text-text-primary">
-                        {level.label} {level.zh}
-                      </span>
-                      <span className="truncate text-caption-1-semibold text-text-tertiary">
-                        {level.desc}
-                      </span>
-                    </span>
-                    {index === effort ? (
-                      <RiCheckLine className="size-4 shrink-0 text-foreground-icon-secondary" aria-hidden />
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
 
           <div className="flex shrink-0 items-center gap-2 ps-1.5">
             {busy ? (
@@ -347,6 +204,126 @@ export function AgentComposer({
       </div>
     </div>
   ));
+}
+
+const MODEL_OPTIONS: ReadonlyArray<{ id: string; reason: string | null }> = [
+  { id: "spark-x2.6", reason: null },
+  { id: "GLM-5.3", reason: "上游故障 500" },
+  { id: "GLM-5.3-Flash", reason: "余额不足 402" },
+  { id: "glm-5.3", reason: "渠道密钥失效 401（向量潮汐）" },
+  { id: "glm-5.3-flash", reason: "余额不足 402" },
+  { id: "moonshotai/kimi-k3", reason: "不存在 404" },
+  { id: "moonshotai/kimi-k3-free", reason: "已退役 502（2026-10-27）" },
+  { id: "qiniu/conatus-free", reason: "全局限流 429" },
+];
+
+const MENU_POPOVER_CLASS = cx(
+  "w-[266px] max-w-[calc(100vw-32px)] origin-bottom-left",
+  "rounded-2xl border border-border-button-default bg-background-primary-default p-2.5 shadow-dropdown",
+  "transition duration-150 ease-out",
+  "data-[entering]:opacity-0 data-[entering]:scale-95 data-[entering]:blur-[2px]",
+  "data-[exiting]:opacity-0 data-[exiting]:scale-95 data-[exiting]:blur-[2px]",
+);
+function useMenuState() {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLElement>(null);
+  const popoverRef = useRef<HTMLElement>(null);
+  useDismissOnOutsidePress(open, () => setOpen(false), [triggerRef, popoverRef]);
+  const allowOpenChange = useTriggerToggle(open, triggerRef);
+  const onOpenChange = (next: boolean) => {
+    if (allowOpenChange(next)) setOpen(next);
+  };
+  return { open, setOpen, triggerRef, popoverRef, onOpenChange };
+}
+function ModelSettingsMenu({ model, onModelChange, effort, onEffortChange }: { model: string; onModelChange?: (model: string) => void; effort: number; onEffortChange?: (effort: number) => void }) {
+  const { open, setOpen, triggerRef, popoverRef, onOpenChange } = useMenuState();
+  const effortLabel = EFFORT_LEVELS[effort] ?? EFFORT_LEVELS[1];
+  return (
+    <AriaDialogTrigger isOpen={open} onOpenChange={onOpenChange}>
+      <Pressable ref={triggerRef}>
+        <button
+          type="button"
+          className="flex h-8 shrink-0 cursor-pointer items-center justify-center gap-0.5 rounded-xl bg-background-primary-default py-1.5 pe-1 ps-2 outline-none transition-colors duration-150 ease hover:bg-background-primary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+        >
+          <span className="px-0.5 text-body-medium whitespace-nowrap text-text-secondary">{shortModel(model)}</span>
+          <RiArrowDownSLine
+            className={cx(
+              "size-[18px] shrink-0 text-foreground-icon-secondary transition-transform duration-200 ease",
+              open && "rotate-180",
+            )}
+            aria-hidden
+          />
+        </button>
+      </Pressable>
+      <AriaPopover ref={popoverRef} isNonModal placement="top start" offset={8} className={MENU_POPOVER_CLASS}>
+        <AriaDialog aria-label="Model settings" className="flex flex-col outline-none">
+          <div className="flex flex-col">
+            <div className="flex w-full flex-col gap-1.5 pt-1">
+              <span className="ps-2 text-body-medium text-text-secondary">Models</span>
+              <div className="flex w-full flex-col gap-1" role="radiogroup" aria-label="Model">
+                {MODEL_OPTIONS.map((option) => {
+                  const isDisabled = option.reason !== null;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={option.id === model}
+                      disabled={isDisabled}
+                      aria-disabled={isDisabled}
+                      onClick={() => {
+                        onModelChange?.(option.id);
+                        setOpen(false);
+                      }}
+                      className={cx(
+                        "flex w-full cursor-pointer items-center justify-between gap-2.5 rounded-2lg p-2 outline-none transition-colors",
+                        option.id === model
+                          ? "bg-background-primary-hover"
+                          : "hover:bg-background-primary-hover focus-visible:bg-background-primary-hover",
+                        isDisabled && "cursor-not-allowed opacity-40",
+                      )}
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-body-medium whitespace-nowrap text-text-primary">{shortModel(option.id)}</span>
+                        {option.reason !== null && (
+                          <span className="truncate text-caption-1-semibold text-text-tertiary">{option.reason}</span>
+                        )}
+                      </span>
+                      <RadioDot selected={option.id === model} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="-mx-2.5 mt-[7px] mb-3 h-px bg-border-button-default" />
+            <div className="flex w-full flex-col">
+              <span className="ps-2 text-body-medium text-text-secondary">
+                Effort{" "}
+                <motion.span
+                  key={effortLabel}
+                  initial={{ opacity: 0, filter: "blur(4px)" }}
+                  animate={{ opacity: 1, filter: "blur(0px)" }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="inline-block text-text-primary"
+                >
+                  {effortLabel}
+                </motion.span>
+              </span>
+              <div className="flex w-full flex-col gap-1">
+                <div className="flex w-full items-center justify-between px-2 pt-2 pb-[3px]">
+                  <span className="text-body-2-medium whitespace-nowrap text-text-secondary">Faster</span>
+                  <span className="text-body-2-medium whitespace-nowrap text-text-secondary">Smarter</span>
+                </div>
+                <div className="w-full px-2 pb-2">
+                  <EffortSlider value={effort} onChange={(v) => onEffortChange?.(v)} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </AriaDialog>
+      </AriaPopover>
+    </AriaDialogTrigger>
+  );
 }
 
 function StatusItem({
