@@ -2,9 +2,11 @@
 
 import { useTemplateCopy } from "@/components/boardui/foundations/template-copy/template-copy";
 
-import { RiCheckLine, RiFileCopyLine, RiVolumeMuteLine, RiVolumeUpLine } from "@remixicon/react";
+import { RiCheckLine, RiFileCopyLine, RiHeartFill, RiHeartLine, RiVolumeMuteLine, RiVolumeUpLine } from "@remixicon/react";
 import { motion, useReducedMotion } from "motion/react";
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { cx } from "@/utils/cx";
 
@@ -35,7 +37,7 @@ export function AgentMessage({ role, text, streaming = false, at }: AgentMessage
 
   if (role === "user") {
     return localize((
-      <p className="ms-auto flex w-fit max-w-[75%] flex-col rounded-2xl bg-background-primary-default px-3 py-[11px] text-start text-body-regular break-words whitespace-pre-wrap text-text-primary shadow-card">
+      <p className="ms-auto flex w-fit max-w-[75%] flex-col rounded-2xl bg-button-primary px-3 py-[11px] text-start text-body-regular break-words whitespace-pre-wrap text-white shadow-card">
         {text}
       </p>
     ));
@@ -50,35 +52,40 @@ export function AgentMessage({ role, text, streaming = false, at }: AgentMessage
 }
 
 /**
- * Paragraphs, each softening in once as it first appears.
+ * Blocks, each softening in once as it first appears. Blocks are split on
+ * blank lines, with blank lines inside fenced code blocks left unbroken so a
+ * code sample keeps its structure.
  *
- * The animation deliberately lives at the line level rather than the word
+ * The animation deliberately lives at the block level rather than the word
  * level. Animating words looks worse in practice: a token arrives as a
  * fragment, the blur-in plays on that fragment, and then the fragment mutates
  * to the finished word with no transition — which reads as a stutter. It also
  * forces a swap from animated spans back to plain text when the stream ends,
  * and everything mid-flight snaps at once.
  *
- * A line mounts exactly once and then only grows, so nothing ever restarts or
- * snaps. Evenness of the text itself comes from the server, which releases
- * whole words on a steady tick (see `smoothStream` in the route).
+ * A block mounts exactly once and then only grows, so nothing ever restarts or
+ * snaps; finished blocks never replay their animation. Evenness of the text
+ * itself comes from the server, which releases whole words on a steady tick
+ * (see `smoothStream` in the route). While streaming, the last block keeps
+ * growing, and an unclosed ** or an unformed table is shown as raw text at
+ * first and corrects itself automatically as tokens arrive.
  */
-export function StreamedText({ text, paragraphs = false }: { text: string; paragraphs?: boolean }) {
+export function StreamedText({ text }: { text: string }) {
   const localize = useTemplateCopy();
   const reduceMotion = useReducedMotion();
-  const lines = useMemo(() => text.split(paragraphs ? /\n\s*\n/ : "\n").filter((line) => line.trim() !== ""), [text, paragraphs]);
+  const blocks = useMemo(() => splitMarkdownBlocks(text), [text]);
 
   return localize((
     <div className="flex flex-col gap-3">
-      {lines.map((line, index) => (
-        <Line key={index} text={line} animate={!reduceMotion} />
+      {blocks.map((block, index) => (
+        <MarkdownBlock key={index} text={block} animate={!reduceMotion} />
       ))}
     </div>
   ));
 }
 
 /**
- * At module scope so their identity is stable. A line re-renders on every
+ * At module scope so their identity is stable. A block re-renders on every
  * token of the reply — dozens of times a second — and handing Motion a fresh
  * object literal each time invites it to re-evaluate a target that has not
  * actually changed.
@@ -88,31 +95,194 @@ const LINE_SHOWN = { opacity: 1, filter: "blur(0px)", y: 0 };
 const LINE_TRANSITION = { duration: 0.42, ease: [0.22, 0.61, 0.36, 1] } as const;
 
 /**
- * A settled line keeps `filter: blur(0px)` rather than losing the filter
+ * A settled block keeps `filter: blur(0px)` rather than losing the filter
  * altogether — Motion owns that property once it animates it, and a `style`
- * override does not win it back. At one filtered element per paragraph the
+ * override does not win it back. At one filtered element per block the
  * cost is invisible; it was only a problem when every word carried its own.
  *
- * memo matters here: without it every paragraph re-renders on each token of
- * the reply, which is wasted work for the lines that are already finished.
+ * memo matters here: without it every block re-renders on each token of the
+ * reply, which is wasted work for the blocks that are already finished.
  */
-const Line = memo(function Line({ text, animate }: { text: string; animate: boolean }) {
-  return (
-    <motion.p
-      initial={animate ? LINE_HIDDEN : false}
-      animate={LINE_SHOWN}
-      transition={LINE_TRANSITION}
-      className="text-body-regular break-words text-text-primary"
+function splitMarkdownBlocks(text: string): string[] {
+  const lines = text.split("\n");
+  const blocks: string[] = [];
+  let current: string[] = [];
+  let inFence = false;
+
+  for (const line of lines) {
+    if (line.trimStart().startsWith("```")) {
+      inFence = !inFence;
+      current.push(line);
+      continue;
+    }
+
+    if (line.trim() === "" && !inFence) {
+      if (current.length > 0) {
+        const block = current.join("\n").trim();
+        if (block.length > 0) {
+          blocks.push(block);
+        }
+        current = [];
+      }
+      continue;
+    }
+
+    current.push(line);
+  }
+
+  if (current.length > 0) {
+    const block = current.join("\n").trim();
+    if (block.length > 0) {
+      blocks.push(block);
+    }
+  }
+
+  return blocks;
+}
+
+const MARKDOWN_COMPONENTS: Components = {
+  h1: ({ node, children, ...rest }) => (
+    <h1 className="text-title-2-semibold break-words text-text-primary" {...rest}>
+      {children}
+    </h1>
+  ),
+  h2: ({ node, children, ...rest }) => (
+    <h2 className="text-title-3-semibold break-words text-text-primary" {...rest}>
+      {children}
+    </h2>
+  ),
+  h3: ({ node, children, ...rest }) => (
+    <h3 className="text-body-medium break-words text-text-primary" {...rest}>
+      {children}
+    </h3>
+  ),
+  h4: ({ node, children, ...rest }) => (
+    <h4 className="text-body-medium break-words text-text-primary" {...rest}>
+      {children}
+    </h4>
+  ),
+  p: ({ node, children, ...rest }) => (
+    <p className="text-body-regular break-words text-text-primary" {...rest}>
+      {children}
+    </p>
+  ),
+  ul: ({ node, children, ...rest }) => (
+    <ul className="list-disc space-y-1 ps-5 text-body-regular text-text-primary" {...rest}>
+      {children}
+    </ul>
+  ),
+  ol: ({ node, children, ...rest }) => (
+    <ol className="list-decimal space-y-1 ps-5 text-body-regular text-text-primary" {...rest}>
+      {children}
+    </ol>
+  ),
+  li: ({ node, children, ...rest }) => (
+    <li className="break-words text-text-primary" {...rest}>
+      {children}
+    </li>
+  ),
+  blockquote: ({ node, children, ...rest }) => (
+    <blockquote className="border-l-2 border-border-button-default ps-3 text-body-regular text-text-secondary" {...rest}>
+      {children}
+    </blockquote>
+  ),
+  code: ({ node, children, className, ...rest }) => (
+    <code
+      className={
+        className?.includes("language-")
+          ? "font-mono text-body-2-regular text-text-primary"
+          : "rounded bg-background-secondary-default px-1 py-0.5 font-mono text-body-2-regular text-text-primary"
+      }
+      {...rest}
     >
-      {text}
-    </motion.p>
+      {children}
+    </code>
+  ),
+  pre: ({ node, children, ...rest }) => (
+    <pre className="overflow-x-auto rounded-lg bg-background-secondary-default p-3 font-mono text-body-2-regular text-text-primary" {...rest}>
+      {children}
+    </pre>
+  ),
+  table: ({ node, children, ...rest }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-body-regular text-text-primary" {...rest}>
+        {children}
+      </table>
+    </div>
+  ),
+  th: ({ node, children, ...rest }) => (
+    <th className="border border-border-table bg-background-secondary-default px-2 py-1 text-start text-body-medium text-text-primary" {...rest}>
+      {children}
+    </th>
+  ),
+  td: ({ node, children, ...rest }) => (
+    <td className="border border-border-table px-2 py-1 break-words text-body-regular text-text-primary" {...rest}>
+      {children}
+    </td>
+  ),
+  a: ({ node, children, ...rest }) => (
+    <a className="text-accent-600 underline underline-offset-2" target="_blank" rel="noreferrer noopener" {...rest}>
+      {children}
+    </a>
+  ),
+  strong: ({ node, children, ...rest }) => (
+    <strong className="font-semibold text-text-primary" {...rest}>
+      {children}
+    </strong>
+  ),
+  em: ({ node, children, ...rest }) => (
+    <em className="italic" {...rest}>
+      {children}
+    </em>
+  ),
+  hr: ({ node, children, ...rest }) => (
+    <hr className="border-border-button-default" {...rest} />
+  ),
+};
+
+// memo + 稳定 key 保证已定稿块不重播动画；原始 HTML 按文本处理，不加 rehype-raw，不使用 dangerouslySetInnerHTML。
+const MarkdownBlock = memo(function MarkdownBlock({ text, animate }: { text: string; animate: boolean }) {
+  return (
+    <motion.div initial={animate ? LINE_HIDDEN : false} animate={LINE_SHOWN} transition={LINE_TRANSITION}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+        {text}
+      </ReactMarkdown>
+    </motion.div>
   );
 });
+
+const LIKE_STORAGE_KEY_PREFIX = "shijian-like-";
+
+function hashText(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 33) ^ text.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(16);
+}
 
 function MessageActions({ text, at, hidden }: { text: string; at?: number; hidden: boolean }) {
   const localize = useTemplateCopy();
   const [copied, setCopied] = useState(false);
   const [speaking, setSpeaking] = useState(false);
+  const [liked, setLiked] = useState(false);
+
+  const storageKey = useMemo(
+    () =>
+      at
+        ? `${LIKE_STORAGE_KEY_PREFIX}${at}`
+        : `${LIKE_STORAGE_KEY_PREFIX}hash-${hashText(text)}`,
+    [at, text],
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      setLiked(window.localStorage.getItem(storageKey) === "1");
+    } catch {
+      setLiked(false);
+    }
+  }, [storageKey]);
 
   useEffect(() => {
     if (!copied) return;
@@ -154,6 +324,17 @@ function MessageActions({ text, at, hidden }: { text: string; at?: number; hidde
     setSpeaking(true);
   };
 
+  const toggleLike = () => {
+    const next = !liked;
+    try {
+      if (next) window.localStorage.setItem(storageKey, "1");
+      else window.localStorage.removeItem(storageKey);
+    } catch {
+      // 存储不可用时静默，状态只保存在内存
+    }
+    setLiked(next);
+  };
+
   return localize((
     <div
       className={cx(
@@ -161,11 +342,19 @@ function MessageActions({ text, at, hidden }: { text: string; at?: number; hidde
         // Revealed on hover, and whenever a control inside has keyboard focus.
         hidden
           ? "pointer-events-none opacity-0"
-          : "opacity-0 group-hover/message:opacity-100 focus-within:opacity-100",
+          : "opacity-70 hover:opacity-100 focus-within:opacity-100",
       )}
     >
       <ActionButton label={copied ? "Copied" : "Copy message"} onClick={copy}>
         {copied ? <RiCheckLine className="size-4" aria-hidden /> : <RiFileCopyLine className="size-4" aria-hidden />}
+      </ActionButton>
+
+      <ActionButton label={liked ? "取消点赞" : "点赞"} onClick={toggleLike}>
+        {liked ? (
+          <RiHeartFill className="size-4 text-red-500" aria-hidden />
+        ) : (
+          <RiHeartLine className="size-4" aria-hidden />
+        )}
       </ActionButton>
 
       <ActionButton label={speaking ? "Stop reading aloud" : "Read aloud"} onClick={toggleSpeech}>
