@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RiCloseLine, RiMenuLine } from '@remixicon/react';
-import { FileText, Image as ImageIcon } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { cx } from '@/utils/cx';
 import { ProfileModal } from '@/components/shijian/chat/profile-modal';
 import { EvaluateCard } from '@/components/shijian/chat/evaluate-card';
@@ -85,8 +85,7 @@ function ChatPageInner() {
   } = chat;
 
   const [inputValue, setInputValue] = useState('');
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const docInputRef = useRef<HTMLInputElement | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
@@ -171,6 +170,17 @@ function ChatPageInner() {
     const value = inputValue;
     setInputValue('');
     void send(value);
+  };
+
+  const handleAttachFile = (file: File) => {
+    const isImage =
+      file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
+    if (isImage) handleImageFile(file);
+    else handleDocFile(file);
+  };
+
+  const openAttachPicker = () => {
+    attachInputRef.current?.click();
   };
 
   const sidebar = (
@@ -364,60 +374,27 @@ function ChatPageInner() {
                 onValueChange={setInputValue}
                 onSubmit={handleSubmit}
                 onStop={stop}
+                onAddAttachment={openAttachPicker}
                 busy={busy}
                 model="spark-x2.6"
                 provider="BotsRouter"
                 messageCount={messages.length}
               />
 
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5">
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="visually-hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageFile(file);
-                      e.target.value = '';
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    disabled={busy}
-                    onClick={() => imageInputRef.current?.click()}
-                  >
-                    <ImageIcon className="size-4" />
-                    图片
-                  </Button>
-
-                  <input
-                    ref={docInputRef}
-                    type="file"
-                    accept=".txt,.md,.pdf,.doc,.docx"
-                    className="visually-hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleDocFile(file);
-                      e.target.value = '';
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="small"
-                    disabled={busy}
-                    onClick={() => docInputRef.current?.click()}
-                  >
-                    <FileText className="size-4" />
-                    文档
-                  </Button>
-                </div>
-                <p className="hidden text-caption-1-semibold text-text-tertiary sm:block">
-                  纯文本文档可直接读取，PDF / Word 若无法读取正文，请复制粘贴文字。
-                </p>
-              </div>
+              <input
+                ref={attachInputRef}
+                type="file"
+                accept="image/*,.txt,.md,.pdf,.doc,.docx"
+                className="visually-hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleAttachFile(file);
+                  e.target.value = '';
+                }}
+              />
+              <p className="mt-2 hidden text-caption-1-semibold text-text-tertiary sm:block">
+                纯文本文档可直接读取，PDF / Word 若无法读取正文，请复制粘贴文字。
+              </p>
             </div>
           </div>
         </div>

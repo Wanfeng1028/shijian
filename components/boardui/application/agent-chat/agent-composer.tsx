@@ -37,6 +37,7 @@ export interface AgentComposerProps {
   onValueChange: (value: string) => void;
   onSubmit: () => void;
   onStop: () => void;
+  onAddAttachment?: () => void;
   busy: boolean;
   /** Model id reported by the runtime, e.g. "openai/gpt-5-nano". */
   model?: string | null;
@@ -50,6 +51,7 @@ export function AgentComposer({
   onValueChange,
   onSubmit,
   onStop,
+  onAddAttachment,
   busy,
   model,
   provider,
@@ -95,10 +97,13 @@ export function AgentComposer({
               same control. They resolve one step lighter than the pill in dark
               and one step darker in light, which is why a single pair works for
               both themes without a dark: override. */}
+          {/* 史鉴加的上传入口：点回形针打开文件选择。BoardUI 免费模板原版此处无回调（它是 Pro 版插件面板的占位），接线是用户亲令的偏离 1:1 之处。 */}
           <button
             type="button"
             aria-label="Add attachment"
-            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-ai-chat-composer-add-background text-foreground-icon-primary transition-colors duration-150 ease hover:bg-ai-chat-composer-add-hover-background"
+            onClick={onAddAttachment}
+            disabled={busy}
+            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-ai-chat-composer-add-background text-foreground-icon-primary transition-colors duration-150 ease hover:bg-ai-chat-composer-add-hover-background disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RiAttachment2 className="size-5" aria-hidden />
           </button>
