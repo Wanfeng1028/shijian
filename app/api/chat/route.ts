@@ -389,6 +389,281 @@ async function callBotsRouterStream(
   }
 }
 
+export async function POST(request: Request): Promise<Response> {
+  let input: unknown;
+
+  try {
+    input = await request.json();
+  } catch (_) {
+    return json(400, { error: 'upstream_error', message: '请求体不是合法 JSON' });
+  }
+
+  const body: ShijianInput = input && typeof input === 'object' ? (input as ShijianInput) : {};
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (isRateLimited(ip)) {
+    return json(429, { error: 'rate_limited', message: '请求太频繁，请稍后再试' });
+  }
+
+  const apiKey = process.env.BOTSROUTER_API_KEY;
+  if (!apiKey || !String(apiKey).trim()) {
+    return json(503, { error: 'backend_not_configured', message: '后端未配置：未设置 BOTSROUTER_API_KEY' });
+  }
+
+  const bodyRecord = (body as unknown as Record<string, unknown>);
+  const requestedModel = typeof bodyRecord.model === 'string' ? bodyRecord.model : '';
+  const allowedIds = await fetchModelIds(apiKey);
+  const selectedModel = resolveModel(requestedModel, allowedIds);
+  const effortRaw = typeof bodyRecord.effort === 'number' ? bodyRecord.effort : 1;
+  const effortIdx = Number.isFinite(effortRaw) ? Math.min(5, Math.max(0, Math.floor(effortRaw))) : 1;
+  const chatMaxTokens = CHAT_MAX_TOKENS[effortIdx];
+  const evalMaxTokens = EVAL_MAX_TOKENS[effortIdx];
+  const reasoningEffort = REASONING_EFFORTS[effortIdx];
+  const effortWords = EFFORT_WORDS[effortIdx];
+  const action = body.action;
+
+  if (action === 'chat') {
+    let system = buildSystem(body, false);
+
+    const retrievalMessages = sanitizeMessages(body.messages);
+    const query = getRetrievalQuery(body, retrievalMessages);
+
+    try {
+      const retrieved = await retrieveContext(query, {
+        task: body.task,
+        grade: body.grade,
+        textbook: body.textbook
+      });
+      const retrievedContext = typeof retrieved?.context === 'string' ? retrieved.context : '';
+      if (retrievedContext) {
+        system += '\n\n【课本相关段落（供参考，以原文为准）】\n' + retrievedContext;
+      } else {
+        system += '\n\n本次未检索到相关课本段落：涉及课本原文、页码、课名时只按已给材料回答，不知道就明说不知道，不得编造出处。';
+      }
+    } catch (_) {}
+
+    system += '\n\n回答涉及课本内容时，必须引用本次提供的【课本相关段落】，并按（册名·课名·页码）格式标注出处；只许引用本次提供的段落，绝不编造史料、人物原话、数据或出处；没有给出的段落就明说课本里没找到，不许硬凑。';
+    system += '\n\n回复中出现的年份必须与题干史料或本次提供的段落一致；如不一致，以题干史料和段落为准。';
+    system += '\n\n回答的形式要求：不要只有纯文字，按内容需要配结构化形式。用户要时间轴、发展脉络、经过（如“时间轴”“按时间顺序”）时，用 ```timeline 代码块输出时间轴，每行一个事件，格式“年份 | 事件”，2-8 条，事件内容来自本次提供的课本段落，仍按（册名·课名·页码）标注出处；时间轴必须包在 ```timeline 代码块里，不许写成 1840年 | …… 这样的裸纯文本行，没有围栏标记就不算时间轴；用户要对比、比较、异同时，用 Markdown 表格输出对比表，第一列是对比项；用户要比较数字大小（如赔款、数量）时，用 ```chart 代码块输出条形图，第一行是标题，之后每行“名称 | 数字”，只写数字，同样必须包在围栏里；不需要结构化形式的问题保持现有回答方式，不要硬加时间轴或表格。';
+    system += '\n\n本次回复请控制在约 ' + effortWords + ' 字左右。';
+    const messages = appendDocText(retrievalMessages, body.docText);
+    const imageData = typeof body.imageData === 'string' && body.imageData.length > 0 ? body.imageData : '';
+    const hasImage = imageData.length > 0;
+    const encoder = new TextEncoder();
+
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const chatFailures: UpstreamFailure[] = [];
+        try {
+          if (hasImage) {
+            // BotsRouter 模型清单里没有 vision 模型，不编造模型 ID。
+            // 先诚实告知图片未被解析，再继续走文字对话，不破坏对话。
+            controller.enqueue(encoder.encode(sseEncode({ t: '图片暂无法解析，请用文字描述关键内容。' })));
+          }
+
+          const textMessages = withSystem(system, messages);
+          let tokenSent = false;
+
+          try {
+            await callBotsRouterStream(apiKey, selectedModel, textMessages, chatMaxTokens, {
+              reasoningEffort,
+              onToken(delta) {
+                tokenSent = true;
+                controller.enqueue(encoder.encode(sseEncode({ t: delta })));
+              }
+            });
+            controller.enqueue(encoder.encode(sseEncode({ done: true, model: selectedModel })));
+            return;
+          } catch (err) {
+            chatFailures.push(toFailure(err, selectedModel));
+            if (tokenSent) {
+              const combined = combineFailures(chatFailures);
+              controller.enqueue(encoder.encode(sseEncode({
+                error: combined.code,
+                code: combined.code,
+                reason: combined.reason,
+                message: combined.message
+              })));
+              return;
+            }
+          }
+
+          const fallbackModels = selectedModel === PRIMARY ? [FALLBACK] : [PRIMARY, FALLBACK];
+          for (const fbModel of fallbackModels) {
+            try {
+              await callBotsRouterStream(apiKey, fbModel, textMessages, chatMaxTokens, {
+                reasoningEffort,
+                firstTokenTimeoutMs: 30000,
+                onToken(delta) {
+                  tokenSent = true;
+                  controller.enqueue(encoder.encode(sseEncode({ t: delta })));
+                }
+              });
+              controller.enqueue(encoder.encode(sseEncode({ done: true, model: fbModel })));
+              return;
+            } catch (fbErr) {
+              const fbFailure = toFailure(fbErr, fbModel);
+              chatFailures.push(fbFailure);
+              if (!tokenSent && fbFailure.kind === 'rate_limited' && fbModel === FALLBACK) {
+                await new Promise((resolve) => setTimeout(resolve, 4000));
+                try {
+                  await callBotsRouterStream(apiKey, fbModel, textMessages, chatMaxTokens, {
+                    reasoningEffort,
+                    firstTokenTimeoutMs: 30000,
+                    onToken(delta) {
+                      tokenSent = true;
+                      controller.enqueue(encoder.encode(sseEncode({ t: delta })));
+                    }
+                  });
+                  controller.enqueue(encoder.encode(sseEncode({ done: true, model: fbModel })));
+                  return;
+                } catch (retryErr) {
+                  chatFailures.push(toFailure(retryErr, fbModel));
+                }
+              }
+              if (tokenSent) {
+                const combined = combineFailures(chatFailures);
+                controller.enqueue(encoder.encode(sseEncode({
+                  error: combined.code,
+                  code: combined.code,
+                  reason: combined.reason,
+                  message: combined.message
+                })));
+                return;
+              }
+            }
+          }
+
+          if (hasImage) {
+            // 图片未解析的提示已在流开头
+            controller.enqueue(encoder.encode(sseEncode({ done: true, model: 'none' })));
+          } else {
+            const combined = combineFailures(chatFailures);
+            controller.enqueue(encoder.encode(sseEncode({
+              error: combined.code,
+              code: combined.code,
+              reason: combined.reason,
+              message: combined.message
+            })));
+          }
+        } catch (___) {
+          const combined = combineFailures(chatFailures);
+          controller.enqueue(encoder.encode(sseEncode({
+            error: combined.code,
+            code: combined.code,
+            reason: combined.reason,
+            message: combined.message
+          })));
+        } finally {
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
+  }
+
+  if (action === 'roleplay') {
+    // D1 绑定只在 Cloudflare Pages 运行时存在；本地 next dev 取不到时按 null 处理（内置人物仍可用）。
+    let db: D1Database | null = null;
+    try {
+      db = getRequestContext().env.DB ?? null;
+    } catch (_) {
+      db = null;
+    }
+    const figure = await resolveFigure(body.character, db);
+    const system0 = buildRoleplaySystem(body, figure);
+    if (!system0) {
+      return json(400, { error: 'unknown_character', message: '未知的人物 id，请先选择历史人物' });
+    }
+    let system = system0;
+
+    // RAG 仍可附加：只取与人物生前相符的段落作史实依据。
+    const retrievalMessages = sanitizeMessages(body.messages);
+    const query = getRetrievalQuery(body, retrievalMessages);
+    try {
+      const retrieved = await retrieveContext(query, {
+        task: body.task,
+        grade: body.grade,
+        textbook: body.textbook,
+      });
+      const retrievedContext = typeof retrieved?.context === 'string' ? retrieved.context : '';
+      if (retrievedContext) {
+        system += '\n\n【课本相关段落（供参考，以原文为准）】\n' + retrievedContext;
+        system += '\n段落中与人物生前不符的内容（如其死后之事、后世评价）不得作为人物所知，只能作为你判断时代边界的依据。';
+      }
+    } catch (_) {}
+
+    // 角色扮演不做六阶段任务指令、不做评价；字数由提示词铁律六控制（100–200 字）。
+    const messages = appendDocText(retrievalMessages, body.docText);
+    const imageData = typeof body.imageData === 'string' && body.imageData.length > 0 ? body.imageData : '';
+    const textMessages = withSystem(system, messages);
+    // 固定 600 tokens：100–200 字约 300–400 tokens，留出结尾推想声明的余量；不随 effort 档位变化。
+    return streamChatResponse(apiKey, selectedModel, textMessages, 600, undefined, imageData.length > 0);
+  }
+
+  if (action === 'evaluate') {
+    const system = buildSystem(body, true);
+    const conversation = sanitizeMessages(body.messages)
+      .map((m) => (m.role === 'user' ? '学生：' : '史鉴：') + (typeof m.content === 'string' ? m.content : String(m.content ?? '')))
+      .join('\n');
+
+    const messages: ChatMessage[] = [
+      { role: 'system', content: system },
+      { role: 'user', content: conversation }
+    ];
+
+    let result: { text: string; model: string } | null = null;
+    let evalFailures: UpstreamFailure[] = [];
+
+    try {
+      result = await tryEvalModels(apiKey, [selectedModel, PRIMARY, FALLBACK], messages, evalMaxTokens, reasoningEffort);
+    } catch (err) {
+      if (err instanceof CombinedUpstreamError) {
+        evalFailures = err.failures;
+      } else {
+        evalFailures = [toFailure(err, selectedModel)];
+      }
+    }
+
+    if (!result) {
+      const combined = combineFailures(evalFailures);
+      return json(502, { error: combined.code, code: combined.code, reason: combined.reason, message: combined.message });
+    }
+
+    const parsed = parseEvaluationJson(result.text);
+    const scores = parsed && parsed.scores;
+    const keys = ['extraction', 'analysis', 'connection', 'explanation'] as const;
+    const validScores = !!scores
+      && typeof scores === 'object'
+      && keys.every((key) => Number.isInteger(scores[key]) && scores[key] >= 1 && scores[key] <= 5);
+
+    if (!validScores) {
+      return json(502, { error: 'upstream_error', code: 'invalid_evaluation', reason: 'invalid_scores', message: '模型 ' + result.model + ' 返回的评价格式无效，未能解析出四项 1–5 分的评分，请重试。' });
+    }
+
+    return json(200, {
+      scores: {
+        extraction: scores.extraction,
+        analysis: scores.analysis,
+        connection: scores.connection,
+        explanation: scores.explanation
+      },
+      advice: typeof parsed.advice === 'string' ? parsed.advice : '',
+      model: result.model
+    });
+  }
+
+  return json(400, { error: 'upstream_error', message: '未知的 action' });
+}
+
 /**
  * 复用现有流式管线：主模型 → 备用模型 → 备用重试（限流时 4 秒后重试一次），
  * SSE 事件与 chat 分支完全一致：{ t: token }、{ done: true, model }、错误信封。
@@ -519,164 +794,4 @@ async function streamChatResponse(
         'Connection': 'keep-alive'
       }
     });
-}
-
-export async function POST(request: Request): Promise<Response> {
-  let input: unknown;
-
-  try {
-    input = await request.json();
-  } catch (_) {
-    return json(400, { error: 'upstream_error', message: '请求体不是合法 JSON' });
-  }
-
-  const body: ShijianInput = input && typeof input === 'object' ? (input as ShijianInput) : {};
-
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
-  if (isRateLimited(ip)) {
-    return json(429, { error: 'rate_limited', message: '请求太频繁，请稍后再试' });
-  }
-
-  const apiKey = process.env.BOTSROUTER_API_KEY;
-  if (!apiKey || !String(apiKey).trim()) {
-    return json(503, { error: 'backend_not_configured', message: '后端未配置：未设置 BOTSROUTER_API_KEY' });
-  }
-
-  const bodyRecord = (body as unknown as Record<string, unknown>);
-  const requestedModel = typeof bodyRecord.model === 'string' ? bodyRecord.model : '';
-  const allowedIds = await fetchModelIds(apiKey);
-  const selectedModel = resolveModel(requestedModel, allowedIds);
-  const effortRaw = typeof bodyRecord.effort === 'number' ? bodyRecord.effort : 1;
-  const effortIdx = Number.isFinite(effortRaw) ? Math.min(5, Math.max(0, Math.floor(effortRaw))) : 1;
-  const chatMaxTokens = CHAT_MAX_TOKENS[effortIdx];
-  const evalMaxTokens = EVAL_MAX_TOKENS[effortIdx];
-  const reasoningEffort = REASONING_EFFORTS[effortIdx];
-  const effortWords = EFFORT_WORDS[effortIdx];
-  const action = body.action;
-
-  if (action === 'chat') {
-    let system = buildSystem(body, false);
-
-    const retrievalMessages = sanitizeMessages(body.messages);
-    const query = getRetrievalQuery(body, retrievalMessages);
-
-    try {
-      const retrieved = await retrieveContext(query, {
-        task: body.task,
-        grade: body.grade,
-        textbook: body.textbook
-      });
-      const retrievedContext = typeof retrieved?.context === 'string' ? retrieved.context : '';
-      if (retrievedContext) {
-        system += '\n\n【课本相关段落（供参考，以原文为准）】\n' + retrievedContext;
-      } else {
-        system += '\n\n本次未检索到相关课本段落：涉及课本原文、页码、课名时只按已给材料回答，不知道就明说不知道，不得编造出处。';
-      }
-    } catch (_) {}
-
-    system += '\n\n回答涉及课本内容时，必须引用本次提供的【课本相关段落】，并按（册名·课名·页码）格式标注出处；只许引用本次提供的段落，绝不编造史料、人物原话、数据或出处；没有给出的段落就明说课本里没找到，不许硬凑。';
-    system += '\n\n回复中出现的年份必须与题干史料或本次提供的段落一致；如不一致，以题干史料和段落为准。';
-    system += '\n\n回答的形式要求：不要只有纯文字，按内容需要配结构化形式。用户要时间轴、发展脉络、经过（如“时间轴”“按时间顺序”）时，用 ```timeline 代码块输出时间轴，每行一个事件，格式“年份 | 事件”，2-8 条，事件内容来自本次提供的课本段落，仍按（册名·课名·页码）标注出处；时间轴必须包在 ```timeline 代码块里，不许写成 1840年 | …… 这样的裸纯文本行，没有围栏标记就不算时间轴；用户要对比、比较、异同时，用 Markdown 表格输出对比表，第一列是对比项；用户要比较数字大小（如赔款、数量）时，用 ```chart 代码块输出条形图，第一行是标题，之后每行“名称 | 数字”，只写数字，同样必须包在围栏里；不需要结构化形式的问题保持现有回答方式，不要硬加时间轴或表格。';
-    system += '\n\n本次回复请控制在约 ' + effortWords + ' 字左右。';
-    const messages = appendDocText(retrievalMessages, body.docText);
-    const imageData = typeof body.imageData === 'string' && body.imageData.length > 0 ? body.imageData : '';
-    const textMessages = withSystem(system, messages);
-    return streamChatResponse(apiKey, selectedModel, textMessages, chatMaxTokens, reasoningEffort, imageData.length > 0);
-  }
-
-  if (action === 'roleplay') {
-    // D1 绑定只在 Cloudflare Pages 运行时存在；本地 next dev 取不到时按 null 处理（内置人物仍可用）。
-    let db: D1Database | null = null;
-    try {
-      db = getRequestContext().env.DB ?? null;
-    } catch (_) {
-      db = null;
-    }
-    const figure = await resolveFigure(body.character, db);
-    const system0 = buildRoleplaySystem(body, figure);
-    if (!system0) {
-      return json(400, { error: 'unknown_character', message: '未知的人物 id，请先选择历史人物' });
-    }
-    let system = system0;
-
-    // RAG 仍可附加：只取与人物生前相符的段落作史实依据。
-    const retrievalMessages = sanitizeMessages(body.messages);
-    const query = getRetrievalQuery(body, retrievalMessages);
-    try {
-      const retrieved = await retrieveContext(query, {
-        task: body.task,
-        grade: body.grade,
-        textbook: body.textbook,
-      });
-      const retrievedContext = typeof retrieved?.context === 'string' ? retrieved.context : '';
-      if (retrievedContext) {
-        system += '\n\n【课本相关段落（供参考，以原文为准）】\n' + retrievedContext;
-        system += '\n段落中与人物生前不符的内容（如其死后之事、后世评价）不得作为人物所知，只能作为你判断时代边界的依据。';
-      }
-    } catch (_) {}
-
-    // 角色扮演不做六阶段任务指令、不做评价；字数由提示词铁律六控制（100–200 字）。
-    const messages = appendDocText(retrievalMessages, body.docText);
-    const imageData = typeof body.imageData === 'string' && body.imageData.length > 0 ? body.imageData : '';
-    const textMessages = withSystem(system, messages);
-    // 固定 600 tokens：100–200 字约 300–400 tokens，留出结尾推想声明的余量；不随 effort 档位变化。
-    return streamChatResponse(apiKey, selectedModel, textMessages, 600, undefined, imageData.length > 0);
-  }
-
-  if (action === 'evaluate') {
-    if (typeof body.character === 'string' && body.character.length > 0) {
-      return json(400, { error: 'evaluation_not_available', message: '沉浸对话不参与学习评价' });
-    }
-    const system = buildSystem(body, true);
-    const conversation = sanitizeMessages(body.messages)
-      .map((m) => (m.role === 'user' ? '学生：' : '史鉴：') + (typeof m.content === 'string' ? m.content : String(m.content ?? '')))
-      .join('\n');
-
-    const messages: ChatMessage[] = [
-      { role: 'system', content: system },
-      { role: 'user', content: conversation }
-    ];
-
-    let result: { text: string; model: string } | null = null;
-    let evalFailures: UpstreamFailure[] = [];
-
-    try {
-      result = await tryEvalModels(apiKey, [selectedModel, PRIMARY, FALLBACK], messages, evalMaxTokens, reasoningEffort);
-    } catch (err) {
-      if (err instanceof CombinedUpstreamError) {
-        evalFailures = err.failures;
-      } else {
-        evalFailures = [toFailure(err, selectedModel)];
-      }
-    }
-
-    if (!result) {
-      const combined = combineFailures(evalFailures);
-      return json(502, { error: combined.code, code: combined.code, reason: combined.reason, message: combined.message });
-    }
-
-    const parsed = parseEvaluationJson(result.text);
-    const scores = parsed && parsed.scores;
-    const keys = ['extraction', 'analysis', 'connection', 'explanation'] as const;
-    const validScores = !!scores
-      && typeof scores === 'object'
-      && keys.every((key) => Number.isInteger(scores[key]) && scores[key] >= 1 && scores[key] <= 5);
-
-    if (!validScores) {
-      return json(502, { error: 'upstream_error', code: 'invalid_evaluation', reason: 'invalid_scores', message: '模型 ' + result.model + ' 返回的评价格式无效，未能解析出四项 1–5 分的评分，请重试。' });
-    }
-
-    return json(200, {
-      scores: {
-        extraction: scores.extraction,
-        analysis: scores.analysis,
-        connection: scores.connection,
-        explanation: scores.explanation
-      },
-      advice: typeof parsed.advice === 'string' ? parsed.advice : '',
-      model: result.model
-    });
-  }
-
-  return json(400, { error: 'upstream_error', message: '未知的 action' });
 }
