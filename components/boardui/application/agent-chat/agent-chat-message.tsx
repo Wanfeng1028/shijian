@@ -205,7 +205,7 @@ const MARKDOWN_COMPONENTS: Components = {
   ),
   table: ({ node, children, ...rest }) => (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-body-regular text-text-primary" {...rest}>
+      <table className="w-full min-w-[480px] border-collapse text-body-regular text-text-primary [&_th:first-child]:whitespace-nowrap [&_td:first-child]:whitespace-nowrap" {...rest}>
         {children}
       </table>
     </div>
