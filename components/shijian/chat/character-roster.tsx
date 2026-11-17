@@ -28,6 +28,7 @@ export interface CharacterRosterProps {
 export function CharacterRoster({ selectedId, onSelect, busy, className }: CharacterRosterProps) {
   const [characters, setCharacters] = useState<PublicCharacter[]>([]);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +39,9 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -118,7 +122,7 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
                 </button>
               );
             })}
-            {visibleCharacters.length === 0 && !failed && (
+            {visibleCharacters.length === 0 && !failed && !loading && (
               <p className="px-2 py-3 text-body-regular text-text-tertiary">
                 没有匹配“{query.trim()}”的人物。
               </p>
