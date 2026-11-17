@@ -1,3 +1,4 @@
+# probe v4: verify auto-merge
 name: auto-merge
 
 on:
