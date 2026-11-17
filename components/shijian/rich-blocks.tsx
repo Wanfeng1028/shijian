@@ -19,18 +19,17 @@ export function parseRichBlock(
   if (!trimmed) return null;
 
   const lines = trimmed.split("\n");
-  if (lines.length < 3) return null;
+  if (lines.length < 2) return null;
 
   const firstLine = lines[0].trimEnd();
   const lastLine = lines[lines.length - 1].trim();
-  if (lastLine !== "```") return null;
 
-  if (firstLine === "```timeline") {
+  if (lastLine === "```" && firstLine === "```timeline") {
     const events: TimelineEvent[] = [];
     for (const rawLine of lines.slice(1, lines.length - 1)) {
-      const parts = rawLine.split("|");
-      const label = parts[0]?.trim() ?? "";
-      const text = parts[1]?.trim() ?? "";
+      const sepIndex = rawLine.search(/[|｜]/);
+      const label = sepIndex === -1 ? rawLine.trim() : rawLine.slice(0, sepIndex).trim();
+      const text = sepIndex === -1 ? "" : rawLine.slice(sepIndex + 1).trim();
       if (label === "" || text === "") continue;
       events.push({ label, text });
     }
@@ -38,16 +37,16 @@ export function parseRichBlock(
     return { kind: "timeline", events };
   }
 
-  if (firstLine === "```chart") {
+  if (lastLine === "```" && firstLine === "```chart") {
     const contentLines = lines.slice(1, lines.length - 1);
     const title = contentLines[0]?.trim() ?? "";
     if (title === "") return null;
 
     const bars: ChartBar[] = [];
     for (const rawLine of contentLines.slice(1)) {
-      const parts = rawLine.split("|");
-      const label = parts[0]?.trim() ?? "";
-      const rawValue = parts[1] ?? "";
+      const sepIndex = rawLine.search(/[|｜]/);
+      const label = sepIndex === -1 ? rawLine.trim() : rawLine.slice(0, sepIndex).trim();
+      const rawValue = sepIndex === -1 ? "" : rawLine.slice(sepIndex + 1);
       const normalized = rawValue
         .replace(/[,，\s]/g, "")
         .replace(/[\u4e00-\u9fa5]/g, "");
@@ -59,6 +58,8 @@ export function parseRichBlock(
     return { kind: "chart", title, bars: bars.slice(0, 8) };
   }
 
+  const bare = parseBareTimeline(trimmed);
+  if (bare) return bare;
   return null;
 }
 
@@ -113,4 +114,37 @@ export function ChartBlock({ title, bars }: { title: string; bars: ChartBar[] })
       </ul>
     </div>
   );
+}
+
+export function parseBareTimeline(
+  block: string,
+): { kind: 'timeline'; events: TimelineEvent[] } | null {
+  const lines = block
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+
+  if (lines.length > 0 && (lines[0].startsWith("#") || lines[0] === "时间轴")) {
+    lines.shift();
+  }
+
+  if (lines.length < 2) return null;
+
+  for (const line of lines) {
+    if (line.includes("---")) return null;
+    if (/^[\s|:\-]+$/.test(line) && line.includes("|")) return null;
+  }
+
+  const events: TimelineEvent[] = [];
+  for (const line of lines) {
+    const sepIndex = line.search(/[|｜]/);
+    if (sepIndex === -1) return null;
+    const label = line.slice(0, sepIndex).trim();
+    const text = line.slice(sepIndex + 1).trim();
+    if (label === "" || text === "") return null;
+    if (!/^\d{3,4}年/.test(label)) return null;
+    events.push({ label, text });
+  }
+
+  return { kind: "timeline", events };
 }
