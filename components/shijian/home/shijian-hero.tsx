@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, FileText, MessageSquare, Search } from 'lucide-react';
+import { ArrowRight, Drama, FileText, MessageSquare, Search } from 'lucide-react';
 
 import { ButtonLink } from '@/components/boardui/base/buttons/button';
 import { TASK_META, TASK_ORDER, type TaskId } from '@/components/shijian/chat/task-meta';
@@ -14,12 +14,13 @@ export interface ShijianHeroProps {
   onStartTask: (task: TaskId) => void;
 }
 
-const ROTATOR_WORDS = ['史料阅读', '史料辨析', '历史解释'] as const;
+const ROTATOR_WORDS = ['史料阅读', '史料辨析', '历史解释', '历史人物对话'] as const;
 
 const TASK_ICONS = {
   reading: FileText,
   analysis: Search,
   explanation: MessageSquare,
+  roleplay: Drama,
 } as const;
 
 const ROTATION_INTERVAL = 2600;

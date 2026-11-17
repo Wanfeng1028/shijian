@@ -11,6 +11,7 @@ import { EvaluateCard } from '@/components/shijian/chat/evaluate-card';
 import { ChatSidebar } from '@/components/shijian/chat/chat-sidebar';
 import { HistoryRail } from '@/components/shijian/chat/history-rail';
 import { TASK_META, TASK_ORDER, type TaskId } from '@/components/shijian/chat/task-meta';
+import { CharacterPicker } from '@/components/shijian/chat/character-picker';
 import { useShijianChat } from '@/components/shijian/chat/use-shijian-chat';
 import { loadRecords, loadTask } from '@/lib/store';
 import { AgentChatActions } from '@/components/boardui/application/agent-chat/agent-chat-actions';
@@ -63,6 +64,9 @@ function ChatPageInner() {
     pendingDocName,
     currentTask,
     switchTask,
+    character,
+    characterFigure,
+    setCharacter,
     grade,
     setGrade,
     textbook,
@@ -119,13 +123,15 @@ function ChatPageInner() {
 
   const headerTitle = useMemo(() => deriveTitle(messages), [messages]);
 
+  const roleplayFigure = currentTask === 'roleplay' ? characterFigure : null;
+
   const transcript = useMemo(
     () =>
       messages
-        .map((m) => `${m.role === 'user' ? '我' : '史鉴'}：${m.content}`)
+        .map((m) => `${m.role === 'user' ? '我' : (roleplayFigure?.name ?? '史鉴')}：${m.content}`)
         .filter((line) => !line.endsWith('：'))
         .join('\n\n'),
-    [messages],
+    [messages, roleplayFigure],
   );
 
   const profileLabel = useMemo(() => {
@@ -208,8 +214,8 @@ function ChatPageInner() {
   }, []);
 
   useEffect(() => {
-    if (lastReplyAt !== null) showEvalTimed();
-  }, [lastReplyAt, showEvalTimed]);
+    if (lastReplyAt !== null && currentTask !== 'roleplay') showEvalTimed();
+  }, [lastReplyAt, showEvalTimed, currentTask]);
 
   useEffect(() => {
     if (scores !== null) showEvalTimed();
@@ -351,7 +357,7 @@ function ChatPageInner() {
                     <p className="text-body-regular text-text-secondary">{TASK_META[currentTask].desc}</p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
-                    {TASK_META[currentTask].quick.map((suggestion) => (
+                    {(roleplayFigure ? roleplayFigure.quickQuestions : TASK_META[currentTask].quick).map((suggestion) => (
                       <button
                         key={suggestion}
                         type="button"
@@ -369,7 +375,7 @@ function ChatPageInner() {
                 ))
               )}
 
-              {messages.length > 0 && evalVisible ? (
+              {messages.length > 0 && evalVisible && currentTask !== 'roleplay' ? (
                 <EvaluateCard
                   scores={scores}
                   advice={advice}
@@ -428,6 +434,10 @@ function ChatPageInner() {
                   <span className="min-w-0 flex-1 truncate text-body-2-regular text-text-secondary">{pendingDocName}</span>
                   <Button variant="ghost" size="xs" onClick={removeDoc}>移除</Button>
                 </div>
+              ) : null}
+
+              {currentTask === 'roleplay' ? (
+                <CharacterPicker selectedId={character} onSelect={setCharacter} busy={busy} />
               ) : null}
 
               <AgentComposer

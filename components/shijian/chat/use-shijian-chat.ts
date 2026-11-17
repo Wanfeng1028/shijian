@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TASK_META, TaskId } from '@/components/shijian/chat/task-meta'
+import { type PublicCharacter } from '@/components/shijian/chat/character-picker'
 import { loadProfile, saveProfile, saveRecord, saveTask, loadProfileSkipped, saveProfileSkipped, updateRecord, newRecordId, Profile, RecordItem } from '@/lib/store'
 
 export interface ChatMessage { role: 'user' | 'assistant'; content: string; at: number }
@@ -19,6 +20,9 @@ export interface UseShijianChatResult {
   pendingDocName: string;
   currentTask: TaskId;
   switchTask: (task: TaskId) => void;
+  character: string | null;
+  characterFigure: PublicCharacter | null;
+  setCharacter: (figure: PublicCharacter) => void;
   topic: string;
   setTopic: (topic: string) => void;
   grade: string;
@@ -70,6 +74,8 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const [pendingDocText, setPendingDocText] = useState('')
   const [pendingDocName, setPendingDocName] = useState('')
   const [currentTask, setCurrentTask] = useState<TaskId>(initialTask)
+  const [character, setCharacterState] = useState<string | null>(null)
+  const [characterFigure, setCharacterFigure] = useState<PublicCharacter | null>(null)
   const [topic, setTopic] = useState('')
   const [profile, setProfile] = useState<Profile | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -122,6 +128,18 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     }
     setGrade(record.grade || '')
     setTextbook(record.textbook || '')
+    if (record.task === 'roleplay' && typeof record.character === 'string' && record.character) {
+      setCharacterState(record.character)
+      // 人物档案（开场白、快捷提问）按 id 从接口补回；取不到时只保留 id，不影响继续对话。
+      fetch('/api/characters')
+        .then((res) => res.json())
+        .then((data) => {
+          const list = Array.isArray(data?.characters) ? (data.characters as PublicCharacter[]) : []
+          const found = list.find((c) => c.id === record.character)
+          if (found) setCharacterFigure(found)
+        })
+        .catch(() => {})
+    }
     setScores(null)
     setAdvice(null)
     setNotice(null)
@@ -132,9 +150,25 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   const switchTask = useCallback((task: TaskId) => {
     setCurrentTask(task)
     saveTask(task)
+    if (task !== 'roleplay') {
+      setCharacterState(null)
+      setCharacterFigure(null)
+    }
     // Only greet mid-thread; on an empty thread the empty state already
     // shows the new task's description and suggestion chips.
     setMessages((prev) => (prev.length === 0 ? prev : [...prev, { ...welcomeFor(task), at: Date.now() }]))
+  }, [])
+
+  const setCharacter = useCallback((figure: PublicCharacter) => {
+    setCharacterState(figure.id)
+    setCharacterFigure(figure)
+    // 换人物即新开对话：清空旧消息，以人物开场白起头。
+    setMessages([{ role: 'assistant', content: figure.greeting, at: Date.now() }])
+    setScores(null)
+    setAdvice(null)
+    setNotice(null)
+    setStatus('准备就绪')
+    activeRecordIdRef.current = null
   }, [])
 
   const resetChat = useCallback(() => {
@@ -155,7 +189,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   }, [])
 
   const buildBody = useCallback(
-    (text: string, lastMessages: ChatMessage[], action: 'chat' | 'evaluate') => {
+    (text: string, lastMessages: ChatMessage[], action: 'chat' | 'evaluate' | 'roleplay') => {
       const EFFORT_LABELS = ['Low', 'Medium', 'Balanced', 'High', 'Very High', 'Max']
       const body: Record<string, unknown> = {
         action,
@@ -168,6 +202,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
         effortLabel: EFFORT_LABELS[effort] || 'Medium',
         messages: lastMessages.slice(-10),
       }
+      if (action === 'roleplay' && character) body.character = character
       if (action === 'chat') {
         if (text) body.text = text
         if (pendingImage) body.imageData = pendingImage
@@ -175,13 +210,17 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
       }
       return body
     },
-    [currentTask, grade, textbook, topic, model, effort, pendingImage, pendingDocText]
+    [currentTask, grade, textbook, topic, model, effort, pendingImage, pendingDocText, character]
   )
 
   const send = useCallback(
     async (text: string) => {
       if (!text || !text.trim()) return
       if (busy) return
+      if (currentTask === 'roleplay' && !character) {
+        setNotice('请先选择一位历史人物')
+        return
+      }
       stoppedRef.current = false
       setBusy(true)
       setNotice(null)
@@ -204,10 +243,11 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
         abortRef.current = controller
         let stalled = false
         try {
+          const action = currentTask === 'roleplay' ? 'roleplay' : 'chat'
           const res = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(buildBody(text, baseMessages, 'chat')),
+            body: JSON.stringify(buildBody(text, baseMessages, action)),
             signal: controller.signal,
           })
           const contentType = res.headers.get('Content-Type') || ''
@@ -339,6 +379,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
               date: new Date().toISOString(),
               topic: topic || text.slice(0, 20),
               task: currentTask,
+              character: currentTask === 'roleplay' ? character ?? '' : '',
               summary: replyText.slice(0, 60),
               messages: doneMessages,
               grade,
@@ -370,7 +411,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
       setBusy(false)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [busy, messages, buildBody, resetTimer, topic, currentTask]
+    [busy, messages, buildBody, resetTimer, topic, currentTask, character]
   )
 
   const stop = useCallback(() => {
@@ -387,6 +428,10 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
   }, [busy, streamingText])
 
   const evaluate = useCallback(async () => {
+    if (currentTask === 'roleplay') {
+      setNotice('沉浸对话不参与学习评价')
+      return
+    }
     if (messages.length < 2) {
       setNotice('先完成一次对话再生成评价')
       return
@@ -430,7 +475,7 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     } finally {
       setEvaluating(false)
     }
-  }, [messages, buildBody])
+  }, [messages, buildBody, currentTask])
 
   const handleImageFile = useCallback((file: File) => {
     if (file.size > 2 * 1024 * 1024) {
@@ -477,6 +522,9 @@ export function useShijianChat(initialTask: TaskId): UseShijianChatResult {
     pendingDocName,
     currentTask,
     switchTask,
+    character,
+    characterFigure,
+    setCharacter,
     topic,
     setTopic,
     grade,

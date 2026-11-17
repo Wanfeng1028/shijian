@@ -16,6 +16,8 @@ export interface RecordItem {
   date: string
   topic: string
   task: string
+  /** 沉浸对话的人物 id；非 roleplay 会话为空字符串 */
+  character?: string
   summary: string
   messages: StoredMessage[]
   grade: string
@@ -66,6 +68,7 @@ function normalizeRecord(value: unknown): RecordItem {
     date: toStr(value.date),
     topic: toStr(value.topic),
     task: toStr(value.task),
+    character: toStr(value.character),
     summary: toStr(value.summary),
     messages,
     grade: toStr(value.grade),
