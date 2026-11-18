@@ -12,13 +12,18 @@
 
 @theme {
   /* ----- Color primitives ----------------------------------------------------
-   * Almost the entire palette matches Tailwind v4's OKLCH defaults. The four
-   * overrides below are the only intentional deviations (see Figma → variables
-   * → color/...).
+   * Almost the entire palette matches Tailwind v4's OKLCH defaults. The
+   * overrides below are the intentional deviations (see Figma → variables
+   * → color/...). Warm-paper palette (2026-11-18): neutral-100/200/300/400/500
+   * are warmed so secondary surfaces, borders and muted text sit on the
+   * #F7F5F0 page instead of cool grey; neutral-200 is the #E9E6DF divider.
    * --------------------------------------------------------------------------*/
   --color-slate-200:   #ebeff5;
-  --color-neutral-100: #f7f7f7;
-  --color-neutral-200: #ebebeb;
+  --color-neutral-100: #f0ede6;
+  --color-neutral-200: #e9e6df;
+  --color-neutral-300: #d8d2c4;
+  --color-neutral-400: #aeaca2;
+  --color-neutral-500: #85877f;
   --color-neutral-925: #121212;
   --color-blue-400:    #3392ff;
 
@@ -28,21 +33,23 @@
    * selected, focus ring, date-range selection) reference accent-* instead of
    * a raw hue, so the whole system re-tints by overriding these eleven
    * variables at runtime (see components/application/theme/accent.ts) or in
-   * a customer project after importing this file. Defaults to the blue
-   * primitives above. Content/data blues (charts, status chips, calendar
+   * a customer project after importing this file. Warm-paper palette
+   * (2026-11-18): sage green ramp, 500 is the specified primary #879782;
+   * keep the primary to buttons, selected states and key info, never as a
+   * large dark surface. Content/data blues (charts, status chips, calendar
    * events, info notifications) deliberately keep referencing blue-*.
    * --------------------------------------------------------------------------*/
-  --color-accent-50:  var(--color-blue-50);
-  --color-accent-100: var(--color-blue-100);
-  --color-accent-200: var(--color-blue-200);
-  --color-accent-300: var(--color-blue-300);
-  --color-accent-400: var(--color-blue-400);
-  --color-accent-500: var(--color-blue-500);
-  --color-accent-600: var(--color-blue-600);
-  --color-accent-700: var(--color-blue-700);
-  --color-accent-800: var(--color-blue-800);
-  --color-accent-900: var(--color-blue-900);
-  --color-accent-950: var(--color-blue-950);
+  --color-accent-50:  #f4f6f4;
+  --color-accent-100: #ecefeb;
+  --color-accent-200: #d9dfd7;
+  --color-accent-300: #bfc8bc;
+  --color-accent-400: #a2ae9e;
+  --color-accent-500: #879782;
+  --color-accent-600: #70806b;
+  --color-accent-700: #596855;
+  --color-accent-800: #434f40;
+  --color-accent-900: #30392d;
+  --color-accent-950: #1f251d;
 
   /* ----- Typography ----------------------------------------------------------
    * Font sizes, weights, line-heights, and tracking all match Tailwind v4
@@ -173,7 +180,7 @@
 :root {
   /* Foreground (icons + on-fill content) */
   --color-foreground-full:               var(--color-white);
-  --color-foreground-icon-primary:       var(--color-neutral-950);
+  --color-foreground-icon-primary:       #353833;
   --color-foreground-icon-hover:         var(--color-black);
   --color-foreground-icon-secondary:     var(--color-neutral-500);
   --color-foreground-icon-tertiary:      var(--color-neutral-400);
@@ -187,8 +194,8 @@
   --color-button-primary-disabled-foreground: var(--color-neutral-400);
 
   /* Text */
-  --color-text-primary:         var(--color-neutral-950);
-  --color-text-secondary:       var(--color-neutral-500);
+  --color-text-primary:         #353833;
+  --color-text-secondary:       #85877f;
   --color-text-tertiary:        var(--color-neutral-400);
   --color-text-disabled:        var(--color-neutral-300);
   --color-text-disabled-danger: var(--color-red-300);
@@ -199,7 +206,7 @@
   --color-text-white:           var(--color-white);
 
   /* Background */
-  --color-background-full:              var(--color-white);
+  --color-background-full:              #f7f5f0;
   /* Ticket detail, Figma 4509:12272. The raw #fafafa surface matches neutral/50. */
   --color-ticket-detail-surface: var(--color-white);
   --color-ticket-detail-low-background: var(--color-indigo-200);
@@ -329,15 +336,15 @@
   --color-badge-neutral-background: var(--color-neutral-200);
   --color-team-menu-count-background: var(--color-neutral-200);
   --color-team-menu-count-foreground: var(--color-neutral-500);
-  --color-badge-new-background: var(--color-accent-100);
-  --color-badge-new-text:       var(--color-accent-600);
+  --color-badge-new-background: #f6eeeb;
+  --color-badge-new-text:       #856251;
   --color-tab-count-selected-background: var(--color-accent-100);
   --color-pill-tab-blue-selected-background: var(--color-accent-50);
   --color-pill-tab-blue-hover-background: var(--color-neutral-100);
 
   /* Notification status-icon surfaces. */
-  --color-notification-information-background: var(--color-blue-100);
-  --color-notification-information-foreground: var(--color-blue-600);
+  --color-notification-information-background: #f2f4f6;
+  --color-notification-information-foreground: #718086;
   --color-notification-success-background:     var(--color-lime-100);
   --color-notification-success-foreground:     var(--color-lime-600);
   --color-notification-error-background:       var(--color-rose-100);
