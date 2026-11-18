@@ -132,7 +132,7 @@ export function formatChunk(chunk: Chunk): string {
 
 export async function retrieveContext(
   query: string,
-  opts: { task?: string; grade?: string; textbook?: string; topK?: number }
+  opts: { task?: string; grade?: string; textbook?: string; topK?: number; minScore?: number; requireLiteral?: string }
 ): Promise<{
   context: string;
   sources: Array<{ id: string; book: string; unit: string; lesson: string; page: string }>;
@@ -160,7 +160,21 @@ export async function retrieveContext(
     results = searchScores(terms, null);
   }
   const topK = typeof opts.topK === 'number' && opts.topK > 0 ? Math.floor(opts.topK) : TOP_K;
-  const hits = results.filter((r) => r.score >= MIN_SCORE).slice(0, topK);
+  // 最低分默认 13.0（按对话问句校准）。人名查询只有 1–2 个二字词，
+  // BM25 满分也只有约 3–8 分，永远过不了 13.0——草拟端点因此传一个
+  // 更低的 floor（minScore: 1，见 /api/characters/draft）；对话问句不受影响。
+  // 语料里完全没有该人名的，仍无任何命中，调用方按无来源处理。
+  const floor = typeof opts.minScore === 'number' && opts.minScore >= 0 ? opts.minScore : MIN_SCORE;
+  let hits = results.filter((r) => r.score >= floor);
+  // 人名草拟（requireLiteral）：只留正文里逐字出现该人名的块。光靠低分线不够——
+  // “不存在的人物某某某”这种名字里“存在”“人物”都是常用词，低分线拦不住，
+  // 必须要求人名本身出现，否则草拟会拿无关段落硬编。先按人名过滤、再取前 topK，
+  // 避免朝代提示的块把人名块挤出前 5。
+  const literal = typeof opts.requireLiteral === 'string' ? normalizeText(opts.requireLiteral) : '';
+  if (literal.length > 0) {
+    hits = hits.filter((r) => normalizeText(chunks[r.doc].text).includes(literal));
+  }
+  hits = hits.slice(0, topK);
   if (hits.length === 0) {
     return { context: "", sources: [] };
   }

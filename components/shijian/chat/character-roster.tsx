@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { RiSearchLine, RiCloseLine } from '@remixicon/react';
+import { useCallback, useEffect, useState } from 'react';
+import { RiAddLine, RiCloseLine, RiSearchLine } from '@remixicon/react';
 import { cx } from '@/utils/cx';
 import { AgentAvatar, avatarForCharacter, AvatarKeyframes } from './character-avatar';
+import { CharacterCreate } from './character-create';
 
 /** /api/characters 返回的公开字段（不含 anchors / neverCross）。 */
 export interface PublicCharacter {
@@ -29,24 +30,34 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
   const [characters, setCharacters] = useState<PublicCharacter[]>([]);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/characters')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && Array.isArray(data?.characters)) setCharacters(data.characters);
-      })
-      .catch(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/characters');
+        const data = (await res.json()) as { characters?: unknown };
+        if (!cancelled && Array.isArray(data?.characters)) setCharacters(data.characters as PublicCharacter[]);
+      } catch {
         if (!cancelled) setFailed(true);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  /** 新建保存后：刷新列表，并直接选中新人物开始对话。 */
+  const handleCreated = useCallback(
+    (figure: PublicCharacter) => {
+      setCharacters((prev) => (prev.some((c) => c.id === figure.id) ? prev : [...prev, figure]));
+      onSelect(figure);
+    },
+    [onSelect],
+  );
 
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -130,7 +141,23 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
 
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="mt-2 flex h-[44px] shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-dashed border-border-button-default text-body-regular text-text-secondary outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring"
+        >
+          <RiAddLine className="size-5" aria-hidden />
+          新建人物
+        </button>
       </aside>
+      {createOpen ? (
+        <CharacterCreate
+          onClose={() => setCreateOpen(false)}
+          existingNames={characters.map((c) => c.name)}
+          onCreated={handleCreated}
+        />
+      ) : null}
     </div>
   );
 }
