@@ -2,6 +2,11 @@
 * 自定义人物草拟端点：POST /api/characters/draft
 * 流程：输入人名 → BM25 检索教材语料（top 5）→ 模型按 DRAFT_SYSTEM 草拟人物卡 → 校验 → 返回草稿 + 依据清单；不保存。
 * 检索不到（教材里没有该人物）直接返回 404，不硬编。
+* 人名查询的 BM25 分只有约 3–8 分，过不了对话用的 13.0 底线，
+* 因此这里传 minScore: 1（只要有一个二字词命中即算有来源）；
+* 另传 requireLiteral: name——正文里必须逐字出现该人名，
+* 否则“不存在的人物某某某”这种名字会因“存在”“人物”是常用词而误命中；
+* 语料里完全没有该人名的，仍无命中，照常 404。
 * 需要 BOTSROUTER_API_KEY；未配置返回 503。草稿未经人工审核，不得直接保存。
 */
 import { retrieveContext} from '@/lib/rag/retrieve';
@@ -82,7 +87,7 @@ return json(503, { error: 'backend_not_configured', message: '后端未配置：
 const query = eraHint? name + ' ' + eraHint: name;
 let retrieved: Awaited<ReturnType<typeof retrieveContext>>;
 try {
-retrieved = await retrieveContext(query, { topK: 5});
+retrieved = await retrieveContext(query, { topK: 5, minScore: 1, requireLiteral: name });
 } catch (_) {
 return json(502, { error: 'upstream_error', message: '教材检索失败，请稍后再试'});
 }
