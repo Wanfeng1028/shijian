@@ -60,6 +60,23 @@ export async function saveCustomCharacter(db: D1Database, figure: HistoricalFigu
     .run();
 }
 
+/** 更新自定义人物（id 不可改；created_at 保持原值）。 */
+export async function updateCustomCharacter(db: D1Database, figure: HistoricalFigure): Promise<void> {
+  await ensureCustomTable(db);
+  await db
+    .prepare('UPDATE custom_characters SET data = ? WHERE id = ?')
+    .bind(JSON.stringify(figure), figure.id)
+    .run();
+}
+
+/** 删除自定义人物；返回是否真的删掉了一行。 */
+export async function deleteCustomCharacter(db: D1Database, id: string): Promise<boolean> {
+  await ensureCustomTable(db);
+  const result = await db.prepare('DELETE FROM custom_characters WHERE id = ?').bind(id).run();
+  const changes = (result as unknown as { meta?: { changes?: number } })?.meta?.changes ?? 0;
+  return changes > 0;
+}
+
 /** 解析人物：内置先查 CHARACTER_MAP，再查 D1 自定义表；都没有返回 null。 */
 export async function resolveFigure(id: unknown, db: D1Database | null): Promise<HistoricalFigure | null> {
   const builtin = getCharacter(id);

@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { RiAddLine, RiCloseLine, RiSearchLine } from '@remixicon/react';
+import { RiAddLine, RiCloseLine, RiDeleteBinLine, RiEditLine, RiSearchLine } from '@remixicon/react';
 import { cx } from '@/utils/cx';
+import type { HistoricalFigure } from '@/lib/characters';
 import { AgentAvatar, avatarForCharacter, AvatarKeyframes } from './character-avatar';
 import { CharacterCreate } from './character-create';
 
@@ -31,6 +32,10 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<{ id: string; figure: HistoricalFigure } | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +63,53 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
     },
     [onSelect],
   );
+
+  /** 编辑保存后：只更新列表条目，不清空当前对话（改的开场白下次选它时才生效）。 */
+  const handleUpdated = useCallback((figure: PublicCharacter) => {
+    setCharacters((prev) => prev.map((c) => (c.id === figure.id ? figure : c)));
+  }, []);
+
+  async function startEdit(figure: PublicCharacter) {
+    setActionError(null);
+    try {
+      const res = await fetch('/api/characters/' + figure.id);
+      const data = (await res.json().catch(() => ({}))) as { character?: unknown };
+      if (res.ok && data.character && typeof data.character === 'object') {
+        setEditing({ id: figure.id, figure: data.character as HistoricalFigure });
+      } else if (res.status === 404) {
+        setActionError('这个人物已被删除，请刷新列表。');
+      } else {
+        setActionError('打不开编辑页，请重试。');
+      }
+    } catch {
+      setActionError('请求失败，请检查网络后重试。');
+    }
+  }
+
+  async function confirmDelete(figure: PublicCharacter) {
+    setDeleteBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch('/api/characters/' + figure.id, { method: 'DELETE' });
+      if (res.ok) {
+        const remaining = characters.filter((c) => c.id !== figure.id);
+        setCharacters(remaining);
+        setDeletingId(null);
+        // 删的正是当前对话的人物：回到列表第一位（孔子），另开对话。
+        if (selectedId === figure.id && remaining.length > 0) onSelect(remaining[0]);
+      } else if (res.status === 404) {
+        setActionError('这个人物已被删除，请刷新列表。');
+        setCharacters((prev) => prev.filter((c) => c.id !== figure.id));
+        setDeletingId(null);
+      } else {
+        setActionError('删除失败，请重试。');
+      }
+    } catch {
+      setActionError('请求失败，请检查网络后重试。');
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -104,6 +156,9 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
         <AvatarKeyframes />
 
         {failed && <p className="p-3 text-body-regular text-text-tertiary">人物列表加载失败，请刷新重试。</p>}
+        {actionError ? (
+          <p className="rounded-xl bg-background-secondary-default px-3 py-2 text-body-regular text-text-error-primary">{actionError}</p>
+        ) : null}
 
         {/* Chat list */}
         <div className="mt-2 flex min-h-0 flex-1 flex-col">
@@ -113,24 +168,71 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
           >
                         {visibleCharacters.map((c, i) => {
               const active = c.id === selectedId;
+              const isCustom = c.source === 'custom';
               return (
-                <button
-                  key={c.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onSelect(c)}
-                  aria-current={active ? "page" : undefined}
-                  className={cx(
-                    "flex h-[54px] shrink-0 items-center gap-2.5 rounded-xl p-1.5 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
-                    active ? "bg-background-tertiary-default" : "hover:bg-background-secondary-hover",
-                  )}
-                >
-                  <AgentAvatar agent={avatarForCharacter(c.id, c.name)} size={40} blinkDelay={`${(i % 5) * 0.7}s`} />
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-body-medium text-text-primary">{c.name}</span>
-                    <span title={c.intro} className="truncate text-body-regular text-text-tertiary">{c.intro}</span>
-                  </span>
-                </button>
+                <div key={c.id} className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onSelect(c)}
+                    aria-current={active ? "page" : undefined}
+                    className={cx(
+                      "flex h-[54px] min-w-0 flex-1 items-center gap-2.5 rounded-xl p-1.5 text-start outline-none transition-colors focus-visible:ring-2 focus-visible:ring-border-focus-ring",
+                      active ? "bg-background-tertiary-default" : "hover:bg-background-secondary-hover",
+                    )}
+                  >
+                    <AgentAvatar agent={avatarForCharacter(c.id, c.name)} size={40} blinkDelay={`${(i % 5) * 0.7}s`} />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-body-medium text-text-primary">{c.name}</span>
+                      <span title={c.intro} className="truncate text-body-regular text-text-tertiary">{c.intro}</span>
+                    </span>
+                  </button>
+                  {isCustom ? (
+                    deletingId === c.id ? (
+                      <span className="flex shrink-0 items-center gap-1 pe-1">
+                        <button
+                          type="button"
+                          disabled={deleteBusy}
+                          onClick={() => confirmDelete(c)}
+                          className="cursor-pointer rounded-full bg-button-primary px-2.5 py-1 text-body-2-regular text-white outline-none focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
+                        >
+                          {deleteBusy ? '删除中…' : '确定删除'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deleteBusy}
+                          onClick={() => setDeletingId(null)}
+                          className="cursor-pointer rounded-full px-2 py-1 text-body-2-regular text-text-secondary outline-none hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
+                        >
+                          取消
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="flex shrink-0 items-center pe-1">
+                        <button
+                          type="button"
+                          aria-label={'编辑' + c.name}
+                          title="编辑"
+                          disabled={busy}
+                          onClick={() => startEdit(c)}
+                          className="flex size-7 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary outline-none hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
+                        >
+                          <RiEditLine className="size-4" aria-hidden />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={'删除' + c.name}
+                          title="删除"
+                          disabled={busy}
+                          onClick={() => setDeletingId(c.id)}
+                          className="flex size-7 cursor-pointer items-center justify-center rounded-full text-foreground-icon-secondary outline-none hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:opacity-40"
+                        >
+                          <RiDeleteBinLine className="size-4" aria-hidden />
+                        </button>
+                      </span>
+                    )
+                  ) : null}
+                </div>
               );
             })}
             {visibleCharacters.length === 0 && !failed && !loading && (
@@ -154,6 +256,15 @@ export function CharacterRoster({ selectedId, onSelect, busy, className }: Chara
       {createOpen ? (
         <CharacterCreate
           onClose={() => setCreateOpen(false)}
+          existingNames={characters.map((c) => c.name)}
+          onCreated={handleCreated}
+        />
+      ) : null}
+      {editing ? (
+        <CharacterCreate
+          editing={editing}
+          onUpdated={handleUpdated}
+          onClose={() => setEditing(null)}
           existingNames={characters.map((c) => c.name)}
           onCreated={handleCreated}
         />

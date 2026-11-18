@@ -151,22 +151,27 @@ export interface CharacterCreateProps {
   onClose: () => void;
   existingNames: string[];
   onCreated: (figure: PublicCharacter) => void;
+  /** 编辑模式：带 id 与完整人物卡；只改卡片内容，id 不可改。 */
+  editing?: { id: string; figure: HistoricalFigure } | null;
+  onUpdated?: (figure: PublicCharacter) => void;
 }
 
 /**
  * 新建自定义人物：输入姓名 → RAG 草拟人物卡 → 用户审核修改 → 保存 → 直接对话。
  * 草拟不到（教材里没有该人物）直接拒，不硬编；草拟失败可手工填写。
  * 七条铁律与内置人物一致；保存前须逐条勾选“依据属实”。
+ * 编辑模式：直接进审核页，改完保存（PUT），不清空当前对话。
  */
-export function CharacterCreate({ onClose, existingNames, onCreated }: CharacterCreateProps) {
-  const [phase, setPhase] = useState<'input' | 'review'>('input');
+export function CharacterCreate({ onClose, existingNames, onCreated, editing, onUpdated }: CharacterCreateProps) {
+  const isEdit = !!editing;
+  const [phase, setPhase] = useState<'input' | 'review'>(isEdit ? 'review' : 'input');
   const [name, setName] = useState('');
   const [eraHint, setEraHint] = useState('');
   const [drafting, setDrafting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [manualMode, setManualMode] = useState(false);
-  const [form, setForm] = useState<FormState>(() => emptyForm());
+  const [form, setForm] = useState<FormState>(() => (editing ? formFromDraft(editing.figure) : emptyForm()));
   const [edited, setEdited] = useState<Set<string>>(new Set());
   const [sources, setSources] = useState<DraftSource[]>([]);
   const [evidenceChecked, setEvidenceChecked] = useState<Set<string>>(new Set());
@@ -277,7 +282,7 @@ export function CharacterCreate({ onClose, existingNames, onCreated }: Character
     setError(null);
     try {
       const figure = {
-        id: '',
+        id: isEdit && editing ? editing.id : '',
         source: 'custom',
         name: form.name.trim(),
         era: form.era.trim(),
@@ -299,18 +304,25 @@ export function CharacterCreate({ onClose, existingNames, onCreated }: Character
         neverCross: lines(form.neverCross),
         quickQuestions: lines(form.quickQuestions),
       };
-      const res = await fetch('/api/characters', {
-        method: 'POST',
+      const url = isEdit && editing ? '/api/characters/' + editing.id : '/api/characters';
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(figure),
       });
       const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-      if (res.status === 201 && data.character && typeof data.character === 'object') {
-        onCreated(data.character as PublicCharacter);
+      if ((res.status === 201 || res.status === 200) && data.character && typeof data.character === 'object') {
+        if (isEdit) {
+          onUpdated?.(data.character as PublicCharacter);
+        } else {
+          onCreated(data.character as PublicCharacter);
+        }
         onClose();
         return;
       }
-      if (res.status === 503) {
+      if (res.status === 404) {
+        setError('这个人物已被删除，请刷新列表。');
+      } else if (res.status === 503) {
         setError('自定义人物存储未配置，保存失败，请稍后再试。');
       } else if (Array.isArray(data.errors) && data.errors.length > 0) {
         setFormErrors((data.errors as unknown[]).map((e) => String(e)));
@@ -327,16 +339,18 @@ export function CharacterCreate({ onClose, existingNames, onCreated }: Character
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="新建历史人物">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-6" role="dialog" aria-modal="true" aria-label={isEdit ? '编辑历史人物' : '新建历史人物'}>
       <button type="button" aria-label="关闭" onClick={onClose} disabled={drafting || saving} className="absolute inset-0 cursor-pointer bg-black/40" />
       <div className="relative max-h-[88dvh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-border-button-default bg-background-primary-default p-5 shadow-xl">
         <div className="mb-1 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-body-medium text-text-primary">新建历史人物</h2>
+            <h2 className="text-body-medium text-text-primary">{isEdit ? '编辑历史人物' : '新建历史人物'}</h2>
             <p className="mt-0.5 text-body-2-regular text-text-tertiary">
-              {phase === 'input'
-                ? '第 1 步：输入姓名，系统从 5 册历史教材里找依据、草拟人物卡。'
-                : '第 2 步：逐条核对人物卡，确认无误后保存，即可开始对话。'}
+              {isEdit
+                ? '改完保存即可；改过的字段会标“已修改”，保存前请再勾选“我已按教材核对”。'
+                : phase === 'input'
+                  ? '第 1 步：输入姓名，系统从 5 册历史教材里找依据、草拟人物卡。'
+                  : '第 2 步：逐条核对人物卡，确认无误后保存，即可开始对话。'}
             </p>
           </div>
           <button
@@ -525,7 +539,9 @@ export function CharacterCreate({ onClose, existingNames, onCreated }: Character
             ) : (
               <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border-button-default px-3 py-2">
                 <input type="checkbox" checked={manualConfirm} onChange={(e) => setManualConfirm(e.target.checked)} className="mt-0.5 size-4 shrink-0 accent-accent-500" />
-                <span className="text-body-regular text-text-primary">我已按教材核对过以上内容（手工填写无自动依据）。</span>
+                <span className="text-body-regular text-text-primary">
+                  {isEdit ? '我已按教材核对过以上修改内容。' : '我已按教材核对过以上内容（手工填写无自动依据）。'}
+                </span>
               </label>
             )}
 
@@ -552,20 +568,22 @@ export function CharacterCreate({ onClose, existingNames, onCreated }: Character
                 disabled={!canSave}
                 className="cursor-pointer rounded-full bg-button-primary px-5 py-2.5 text-body-regular text-white outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {saving ? '正在保存…' : '保存并开始对话'}
+                {saving ? '正在保存…' : isEdit ? '保存修改' : '保存并开始对话'}
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPhase('input');
-                  setError(null);
-                  setFormErrors([]);
-                }}
-                disabled={saving}
-                className="cursor-pointer rounded-full border border-border-button-default px-4 py-2.5 text-body-regular text-text-secondary outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                返回重填
-              </button>
+              {isEdit ? null : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhase('input');
+                    setError(null);
+                    setFormErrors([]);
+                  }}
+                  disabled={saving}
+                  className="cursor-pointer rounded-full border border-border-button-default px-4 py-2.5 text-body-regular text-text-secondary outline-none transition-colors hover:bg-background-secondary-hover focus-visible:ring-2 focus-visible:ring-border-focus-ring disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  返回重填
+                </button>
+              )}
             </div>
           </div>
         )}
